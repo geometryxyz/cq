@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ark_ff::FftField;
+use ark_ff::{FftField, ToBytes};
 
 use crate::error::Error;
 
@@ -9,6 +9,12 @@ pub struct Table<F: FftField> {
     pub(crate) size: usize,
     pub(crate) values: Vec<F>,
     pub(crate) value_index_mapping: BTreeMap<F, usize>,
+}
+
+impl<F: FftField> ToBytes for Table<F> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.values.write(&mut w)
+    }
 }
 
 impl<F: FftField> Table<F> {

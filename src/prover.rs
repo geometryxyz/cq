@@ -13,6 +13,7 @@ use crate::{
     kzg::Kzg,
     table::Table,
     utils::x_pow_d, rng::FiatShamirRng, transcript::TranscriptOracle,
+    PROTOCOL_NAME
 };
 
 pub struct Prover<E: PairingEngine, FS: FiatShamirRng> {
@@ -107,7 +108,6 @@ impl<E: PairingEngine> ToBytes for ProverThirdMessage<E> {
 
 
 impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
-    pub const PROTOCOL_NAME: &'static [u8] = b"CQ-1.0";
     pub fn prove<'a>(
         pk: &'a ProvingKey<E>,
         index: &'a Index<E>,
@@ -116,20 +116,20 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         statement: &Statement<E>,
     ) -> Result<Proof<E>, Error>{
         let mut state = State::new(pk, index, table, witness);
-        let mut transcipt = TranscriptOracle::<FS>::initialize(&Self::PROTOCOL_NAME);
+        let mut transcipt = TranscriptOracle::<FS>::initialize(&PROTOCOL_NAME);
 
-        transcipt.stream_public_input(statement);
+        transcipt.stream_public_input(&index.common, statement);
 
         let first_msg = Self::round_1(&mut state)?;
         transcipt.stream_first_message(&first_msg);
 
-        let beta: E::Fr = transcipt.get_challenge();
+        let beta: E::Fr = transcipt.squeeze_challenge();
 
         let second_msg = Self::round_2(&mut state, beta)?;
         transcipt.stream_second_message(&second_msg);
 
-        let gamma: E::Fr = transcipt.get_challenge();
-        let eta: E::Fr = transcipt.get_challenge();
+        let gamma: E::Fr = transcipt.squeeze_challenge();
+        let eta: E::Fr = transcipt.squeeze_challenge();
 
         let third_msg = Self::round_3(&mut state, gamma, eta)?;
 
@@ -368,11 +368,11 @@ mod prover_rounds_tests {
         {
             let g_2 = G2Affine::prime_subgroup_generator();
             let beta_2 = g_2.mul(beta).into_affine();
-            let rhs_0 = index.t_2 + beta_2;
+            let rhs_0 = index.common.t_2 + beta_2;
 
             let res = Bn254::product_of_pairings(&[
                 (a_cm.neg().into(), rhs_0.into()), 
-                (qa_cm.into(), index.zv_2.into()), 
+                (qa_cm.into(), index.common.zv_2.into()), 
                 (m_cm.into(), g_2.into())
             ]);
 

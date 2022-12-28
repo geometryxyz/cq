@@ -11,22 +11,23 @@ use crate::{
     utils::{construct_lagrange_basis, is_pow_2},
 };
 
-pub struct Index<E: PairingEngine> {
+pub struct CommonPreprocessedInput<E: PairingEngine> {
     pub(crate) zv_2: E::G2Affine,
     pub(crate) t_2: E::G2Affine,
+}
+
+impl<E: PairingEngine> ToBytes for CommonPreprocessedInput<E> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.zv_2.write(&mut w)?;
+        self.t_2.write(&mut w)
+    }
+}
+
+pub struct Index<E: PairingEngine> {
+    pub(crate) common: CommonPreprocessedInput<E>,
     pub(crate) qs: Vec<E::G1Affine>,
     pub(crate) ls: Vec<E::G1Affine>,
     pub(crate) ls_at_0: Vec<E::G1Affine>,
-}
-
-impl<E: PairingEngine> ToBytes for Index<E> {
-    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
-        self.zv_2.write(&mut w)?;
-        self.t_2.write(&mut w)?;
-        self.qs.write(&mut w)?;
-        self.ls.write(&mut w)?;
-        self.ls_at_0.write(&mut w)
-    }
 }
 
 impl<E: PairingEngine> Index<E> {
@@ -65,13 +66,32 @@ impl<E: PairingEngine> Index<E> {
             li_proofs.push((lhs + rhs).into());
         }
 
-        Self {
+        let common = CommonPreprocessedInput {
             zv_2,
-            t_2,
+            t_2
+        };
+
+        Self {
+            common,
             qs,
             ls: lagrange_basis_1,
             ls_at_0: li_proofs,
         }
+    }
+
+    pub fn compute_common(srs_g2: &[E::G2Affine], table: &Table<E::Fr>) -> CommonPreprocessedInput<E> {
+        assert!(is_pow_2(table.size));
+        let domain = GeneralEvaluationDomain::<E::Fr>::new(table.size).unwrap();
+        // step 2: compute [zV(x)]_2
+        let tau_pow_n = srs_g2[table.size];
+        let minus_one = -E::G2Affine::prime_subgroup_generator();
+        let zv_2 = tau_pow_n + minus_one;
+
+        // step 3: compute [T(x)]_2
+        let table_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&table.values));
+        let t_2: E::G2Affine = Kzg::<E>::commit_g2(&srs_g2, &table_poly).into();
+
+        CommonPreprocessedInput { zv_2, t_2 }
     }
 }
 

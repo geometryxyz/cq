@@ -4,4 +4,6 @@ pub enum Error {
     WitnessSizeNotPow2(usize),
     DuplicateValueInTable(String),
     ValueNotInTable(String),
+
+    BatchedPairingFailed
 }
