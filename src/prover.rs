@@ -7,16 +7,17 @@ use ark_poly::{
 };
 
 use crate::{
-    data_structures::{ProvingKey, Witness},
+    data_structures::{ProvingKey, Witness, Proof, Statement},
     error::Error,
     indexer::Index,
     kzg::Kzg,
     table::Table,
-    utils::x_pow_d,
+    utils::x_pow_d, rng::FiatShamirRng, transcript::TranscriptOracle,
 };
 
-pub struct Prover<E: PairingEngine> {
+pub struct Prover<E: PairingEngine, FS: FiatShamirRng> {
     _e: PhantomData<E>,
+    _fs: PhantomData<FS>
 }
 
 pub struct State<'a, E: PairingEngine> {
@@ -105,8 +106,39 @@ impl<E: PairingEngine> ToBytes for ProverThirdMessage<E> {
 }
 
 
-impl<E: PairingEngine> Prover<E> {
-    pub fn prove() {}
+impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
+    pub const PROTOCOL_NAME: &'static [u8] = b"CQ-1.0";
+    pub fn prove<'a>(
+        pk: &'a ProvingKey<E>,
+        index: &'a Index<E>,
+        table: &'a Table<E::Fr>,
+        witness: &'a Witness<E::Fr>,
+        statement: &Statement<E>,
+    ) -> Result<Proof<E>, Error>{
+        let mut state = State::new(pk, index, table, witness);
+        let mut transcipt = TranscriptOracle::<FS>::initialize(&Self::PROTOCOL_NAME);
+
+        transcipt.stream_public_input(statement);
+
+        let first_msg = Self::round_1(&mut state)?;
+        transcipt.stream_first_message(&first_msg);
+
+        let beta: E::Fr = transcipt.get_challenge();
+
+        let second_msg = Self::round_2(&mut state, beta)?;
+        transcipt.stream_second_message(&second_msg);
+
+        let gamma: E::Fr = transcipt.get_challenge();
+        let eta: E::Fr = transcipt.get_challenge();
+
+        let third_msg = Self::round_3(&mut state, gamma, eta)?;
+
+        Ok(Proof {
+            first_msg,
+            second_msg,
+            third_msg,
+        })
+    }
 
     pub fn round_1<'a>(state: &'a mut State<E>) -> Result<ProverFirstMessage<E>, Error> {
         let mut index_multiplicity_mapping = BTreeMap::<usize, E::Fr>::default();
@@ -239,17 +271,44 @@ mod prover_rounds_tests {
     use ark_ff::{UniformRand, One, Field};
     use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
     use ark_std::{rand::rngs::StdRng, test_rng};
+    use rand_chacha::ChaChaRng;
+    use sha3::Keccak256;
 
     use crate::{
         data_structures::{ProvingKey, Witness, Statement},
         indexer::Index,
         table::Table,
-        utils::{to_field, unsafe_setup_from_rng}, kzg::Kzg,
+        utils::{to_field, unsafe_setup_from_rng}, kzg::Kzg, rng::SimpleHashFiatShamirRng,
     };
 
     use super::{Prover, State, ProverSecondMessage, ProverThirdMessage};
 
+    type FS = SimpleHashFiatShamirRng<Keccak256, ChaChaRng>;
+
     // TODO: create prepare function for shared data generation
+
+    #[test]
+    fn test_full_proof() {
+        let n = 8;
+        let mut rng = test_rng();
+
+        let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
+        let pk = ProvingKey { srs_g1, srs_g2 };
+
+        let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
+        let table = Table::new(&to_field(&table_values)).unwrap();
+
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+
+        let witness_values = vec![5, 15, 20, 35];
+        let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
+
+        let statement = Statement::<Bn254> {
+            f: Kzg::<Bn254>::commit_g1(&pk.srs_g1, &witness.f).into()
+        };
+
+        let _ = Prover::<Bn254, FS>::prove(&pk, &index, &table, &witness, &statement).unwrap();
+    }
 
     #[test]
     fn test_round_1() {
@@ -269,7 +328,7 @@ mod prover_rounds_tests {
 
         let mut state = State::new(&pk, &index, &table, &witness);
 
-        let res = Prover::round_1(&mut state);
+        let res = Prover::<Bn254, FS>::round_1(&mut state);
         assert!(res.is_ok());
 
         let keys = vec![1, 3, 4, 7];
@@ -299,10 +358,10 @@ mod prover_rounds_tests {
 
         let mut state = State::new(&pk, &index, &table, &witness);
 
-        let m_cm = Prover::round_1(&mut state).unwrap().m_cm;
+        let m_cm = Prover::<Bn254, FS>::round_1(&mut state).unwrap().m_cm;
 
         let beta = Fr::rand(&mut rng);
-        let second_msg = Prover::round_2(&mut state, beta).unwrap();
+        let second_msg = Prover::<Bn254, FS>::round_2(&mut state, beta).unwrap();
         let ProverSecondMessage { a_cm, qa_cm, b0_cm, qb_cm: _, p_cm } = second_msg;
 
         // check well formation of A
@@ -356,16 +415,16 @@ mod prover_rounds_tests {
 
         let mut state = State::new(&pk, &index, &table, &witness);
 
-        let _ = Prover::round_1(&mut state).unwrap();
+        let _ = Prover::<Bn254, FS>::round_1(&mut state).unwrap();
 
         let beta = Fr::rand(&mut rng);
-        let second_msg = Prover::round_2(&mut state, beta).unwrap();
+        let second_msg = Prover::<Bn254, FS>::round_2(&mut state, beta).unwrap();
         let ProverSecondMessage { a_cm, qa_cm: _, b0_cm, qb_cm, p_cm: _ } = second_msg;
 
         let gamma = Fr::rand(&mut rng);
         let eta = Fr::rand(&mut rng);
 
-        let third_msg = Prover::round_3(&mut state, gamma, eta).unwrap();
+        let third_msg = Prover::<Bn254, FS>::round_3(&mut state, gamma, eta).unwrap();
         let ProverThirdMessage { b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm } = third_msg;
 
         // verifier part

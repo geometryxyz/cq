@@ -1,5 +1,5 @@
 use ark_ec::{AffineCurve, PairingEngine};
-use ark_ff::Field;
+use ark_ff::{Field, ToBytes};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
@@ -17,6 +17,16 @@ pub struct Index<E: PairingEngine> {
     pub(crate) qs: Vec<E::G1Affine>,
     pub(crate) ls: Vec<E::G1Affine>,
     pub(crate) ls_at_0: Vec<E::G1Affine>,
+}
+
+impl<E: PairingEngine> ToBytes for Index<E> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.zv_2.write(&mut w)?;
+        self.t_2.write(&mut w)?;
+        self.qs.write(&mut w)?;
+        self.ls.write(&mut w)?;
+        self.ls_at_0.write(&mut w)
+    }
 }
 
 impl<E: PairingEngine> Index<E> {

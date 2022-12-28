@@ -14,3 +14,4 @@ sha3 = "0.10.6"
 
 [dev-dependencies]
 ark-bn254 = "0.3.0"
+rand_chacha = { version = "0.3.0", default-features = false }
