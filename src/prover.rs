@@ -31,6 +31,7 @@ pub struct State<'a, E: PairingEngine> {
     // captured in round_2
     b0: Option<DensePolynomial<E::Fr>>,
     qb: Option<DensePolynomial<E::Fr>>,
+    a_sparse: Option<BTreeMap<usize, E::Fr>>,
     a_at_zero: Option<E::Fr>
 }
 
@@ -51,6 +52,7 @@ impl<'a, E: PairingEngine> State<'a, E> {
 
             b0: None, 
             qb: None,
+            a_sparse: None,
             a_at_zero: None
         }
     }
@@ -193,21 +195,31 @@ impl<E: PairingEngine> Prover<E> {
         };
 
         state.a_at_zero = Some(a_at_zero);
+        state.a_sparse = Some(a_mapping);
 
         Ok((a_cm, qa_cm, b0_cm, qb_cm, p_cm))
     }
 
-    pub fn round_3<'a>(state: &'a mut State<E>, gamma: E::Fr, eta: E::Fr) -> Result<(E::Fr, E::Fr, E::Fr, E::G1Affine), Error> {
+    pub fn round_3<'a>(state: &'a mut State<E>, gamma: E::Fr, eta: E::Fr) -> Result<(E::Fr, E::Fr, E::Fr, E::G1Affine, E::G1Affine), Error> {
         let b0 = state.b0.as_ref().expect("b0 is missing from state");
         let qb = state.qb.as_ref().expect("qb is missing from state");
+        let a_sparse = state.a_sparse.as_ref().expect("a missing from state");
         let a_at_zero = state.a_at_zero.expect("a at 0 missing from the state");
 
+        // step 2: compute openings of b0 and f
         let b0_at_gamma = b0.evaluate(&gamma);
         let f_at_gamma = state.witness.f.evaluate(&gamma);
 
+        // step 3: compute [A0(X)]_1
+        let mut a0_cm = E::G1Affine::zero();
+        for (&index, &a_i) in a_sparse.iter() {
+            a0_cm = state.index.ls_at_0[index].mul(a_i).add_mixed(&a0_cm).into();
+        }
+
+        // step 6: compute openings proof
         let pi_gamma: E::G1Affine = Kzg::<E>::batch_open_g1(&state.pk.srs_g1, &[b0.clone(), state.witness.f.clone(), qb.clone()], gamma, eta).into();
 
-        Ok((b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma))
+        Ok((b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm))
     }
 }
 
@@ -344,7 +356,7 @@ mod prover_rounds_tests {
         let gamma = Fr::rand(&mut rng);
         let eta = Fr::rand(&mut rng);
 
-        let (b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma) = Prover::round_3(&mut state, gamma, eta).unwrap();
+        let (b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm) = Prover::round_3(&mut state, gamma, eta).unwrap();
 
         // verifier part
         {
@@ -370,6 +382,17 @@ mod prover_rounds_tests {
             let lhs: G1Affine = pi_gamma.mul(gamma).add_mixed(&(c + minus_v_g1)).into();
             let p1 = Bn254::pairing(lhs, g_2);
             let p2 = Bn254::pairing(pi_gamma, pk.srs_g2[1]);
+            assert_eq!(p1, p2);
+        }
+
+        // check a correctness 
+        {
+            let g_2 = G2Affine::prime_subgroup_generator();
+
+            let lhs = G1Affine::prime_subgroup_generator().mul(a_at_zero).neg().add_mixed(&a_cm);
+
+            let p1 = Bn254::pairing(lhs, g_2);
+            let p2 = Bn254::pairing(a0_cm, pk.srs_g2[1]);
             assert_eq!(p1, p2);
         }
     }
