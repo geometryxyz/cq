@@ -12,7 +12,7 @@ use crate::{
     indexer::Index,
     kzg::Kzg,
     table::{self, Table},
-    utils::x_pow_d,
+    utils::{x_pow_d, construct_lagrange_basis},
 };
 
 pub struct Prover<E: PairingEngine> {
@@ -55,16 +55,16 @@ impl<E: PairingEngine> Prover<E> {
         for fi in &state.witness.f_evals {
             let index = state.table.value_index_mapping.get(fi);
             let index = index.ok_or(Error::ValueNotInTable(format!("{}", fi)))?;
-            let num_of_repetitions = index_multiplicity_mapping
+            let multiplicity = index_multiplicity_mapping
                 .entry(*index)
                 .or_insert(E::Fr::zero());
-            *num_of_repetitions = *num_of_repetitions + E::Fr::one();
+            *multiplicity = *multiplicity + E::Fr::one();
         }
 
         let mut m_cm = E::G1Affine::zero();
-        for (&index, &repetitions) in index_multiplicity_mapping.iter() {
+        for (&index, &multiplicity) in index_multiplicity_mapping.iter() {
             m_cm = state.index.ls[index]
-                .mul(repetitions)
+                .mul(multiplicity)
                 .add_mixed(&m_cm)
                 .into();
         }
@@ -94,17 +94,47 @@ impl<E: PairingEngine> Prover<E> {
 
         // step 2&3: computes A sparse representation and a commitment in single pass
         for (&index, &multiplicity) in m_evals.iter() {
-            let a_i = multiplicity * (state.table.values[index] * beta).inverse().unwrap();
+            let a_i = multiplicity * (state.table.values[index] + beta).inverse().unwrap();
             let _ = a_mapping.insert(index, a_i); // keys are unique so overriding will never occur
 
             a_cm = state.index.ls[index].mul(a_i).add_mixed(&a_cm).into();
         }
+
+        // TODO: introduce cfg=test, and ask ifcfg = test
+        // sanity 
+        // {
+        //     let table_domain = GeneralEvaluationDomain::<E::Fr>::new(state.table.size).unwrap();
+        //     let zv: DensePolynomial<_> = table_domain.vanishing_polynomial().into();
+
+        //     let roots: Vec<_> = table_domain.elements().collect();
+        //     let lagrange_basis = construct_lagrange_basis(&roots);
+
+        //     let mut m_poly = DensePolynomial::zero();
+        //     for (&index, &multiplicity) in m_evals.iter() {
+        //         m_poly += (multiplicity, &lagrange_basis[index]);
+        //     }
+
+        //     let mut a_poly = DensePolynomial::zero();
+        //     for (&index, &a_i) in a_mapping.iter() {
+        //         a_poly += (a_i, &lagrange_basis[index]);
+        //     }
+
+        //     let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
+
+        //     table_poly[0] += beta;
+        //     let mut num = &a_poly * &table_poly;
+        //     num += (-E::Fr::one(), &m_poly);
+
+        //     let qa = &num / &zv; 
+        //     assert_eq!(num, &qa * &zv);
+        // }
 
         // step 4: compute [QA(x)]_1
         let mut qa_cm = E::G1Affine::zero();
         for (&index, &a_i) in a_mapping.iter() {
             qa_cm = state.index.qs[index].mul(a_i).add_mixed(&qa_cm).into();
         }
+
 
         // step 5: compute B(X)
         let b_evals: Vec<_> = state
@@ -184,6 +214,10 @@ mod prover_rounds_tests {
         let keys = vec![1, 3, 4, 7];
         let supp_m: Vec<usize> = state.m_evals.as_ref().unwrap().keys().map(|&i| i).collect();
         assert_eq!(keys, supp_m);
+
+        let multiplicities = vec![Fr::one(), Fr::one(), Fr::one(), Fr::one()];
+        let m_values: Vec<Fr> = state.m_evals.as_ref().unwrap().values().map(|&mi| mi).collect();
+        assert_eq!(multiplicities, m_values);
     }
 
     #[test]
@@ -221,7 +255,7 @@ mod prover_rounds_tests {
                 (m_cm.into(), g_2.into())
             ]);
 
-            // assert_eq!(res, Fq12::one());
+            assert_eq!(res, Fq12::one());
         }
 
         // check b0 degree 
