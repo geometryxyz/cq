@@ -11,6 +11,10 @@ pub struct ProvingKey<E: PairingEngine> {
     pub(crate) srs_g2: Vec<E::G2Affine>,
 }
 
+pub struct Statement<E: PairingEngine> {
+    pub(crate) f: E::G1Affine
+}
+
 pub struct Witness<F: FftField> {
     pub(crate) size: usize,
     pub(crate) f: DensePolynomial<F>,

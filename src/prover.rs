@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, marker::PhantomData};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, One, Zero};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial,
 };
 
 use crate::{
@@ -27,6 +27,11 @@ pub struct State<'a, E: PairingEngine> {
 
     // captured in round_1
     m_evals: Option<BTreeMap<usize, E::Fr>>,
+
+    // captured in round_2
+    b0: Option<DensePolynomial<E::Fr>>,
+    qb: Option<DensePolynomial<E::Fr>>,
+    a_at_zero: Option<E::Fr>
 }
 
 impl<'a, E: PairingEngine> State<'a, E> {
@@ -41,7 +46,12 @@ impl<'a, E: PairingEngine> State<'a, E> {
             index,
             table,
             witness,
+
             m_evals: None,
+
+            b0: None, 
+            qb: None,
+            a_at_zero: None
         }
     }
 }
@@ -129,6 +139,7 @@ impl<E: PairingEngine> Prover<E> {
         //     assert_eq!(num, &qa * &zv);
         // }
 
+        // HINT: consider computing qa_cm in above loop
         // step 4: compute [QA(x)]_1
         let mut qa_cm = E::G1Affine::zero();
         for (&index, &a_i) in a_mapping.iter() {
@@ -166,24 +177,52 @@ impl<E: PairingEngine> Prover<E> {
         let p_poly = &b0_poly * &x_pow_d(state.table.size - (state.witness.size + 1));
         let p_cm: E::G1Affine = Kzg::<E>::commit_g1(&state.pk.srs_g1, &p_poly).into();
 
+        state.b0 = Some(b0_poly);
+        state.qb = Some(qb_poly);
+
+        let a_at_zero = {
+            let b_at_zero = b_poly.evaluate(&E::Fr::zero());
+            let n = E::Fr::from(state.witness.size as u64);
+
+            let N_inv = E::Fr::from(state.table.size as u64).inverse().unwrap();
+
+            n * b_at_zero * N_inv
+        };
+
+        state.a_at_zero = Some(a_at_zero);
+
         Ok((a_cm, qa_cm, b0_cm, qb_cm, p_cm))
+    }
+
+    pub fn round_3<'a>(state: &'a mut State<E>, gamma: E::Fr, eta: E::Fr) -> Result<(E::Fr, E::Fr, E::Fr, E::G1Affine), Error> {
+        let b0 = state.b0.as_ref().expect("b0 is missing from state");
+        let qb = state.qb.as_ref().expect("qb is missing from state");
+        let a_at_zero = state.a_at_zero.expect("a at 0 missing from the state");
+
+        let b0_at_gamma = b0.evaluate(&gamma);
+        let f_at_gamma = state.witness.f.evaluate(&gamma);
+
+        let pi_gamma: E::G1Affine = Kzg::<E>::batch_open_g1(&state.pk.srs_g1, &[b0.clone(), state.witness.f.clone(), qb.clone()], gamma, eta).into();
+
+        Ok((b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma))
     }
 }
 
 #[cfg(test)]
 mod prover_rounds_tests {
-    use std::ops::Neg;
+    use std::ops::{Neg, Mul};
 
-    use ark_bn254::{Bn254, Fr, G2Affine, Fq12};
+    use ark_bn254::{Bn254, Fr, G2Affine, Fq12, G1Affine};
     use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-    use ark_ff::{UniformRand, One};
+    use ark_ff::{UniformRand, One, Field};
+    use ark_poly::{domain::general::GeneralElements, GeneralEvaluationDomain, EvaluationDomain};
     use ark_std::{rand::rngs::StdRng, test_rng};
 
     use crate::{
-        data_structures::{ProvingKey, Witness},
+        data_structures::{ProvingKey, Witness, Statement},
         indexer::Index,
         table::Table,
-        utils::{to_field, unsafe_setup_from_rng},
+        utils::{to_field, unsafe_setup_from_rng}, kzg::Kzg,
     };
 
     use super::{Prover, State};
@@ -270,5 +309,66 @@ mod prover_rounds_tests {
                 Bn254::pairing(lhs_1, rhs_1),
             )
         }
+    }
+
+    #[test]
+    fn test_round_3() {
+        let n = 8;
+        let mut rng = test_rng();
+
+        let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
+        let pk = ProvingKey { srs_g1, srs_g2 };
+
+        let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
+        let table = Table::new(&to_field(&table_values)).unwrap();
+
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+
+        let witness_values = vec![5, 15, 20, 35];
+        let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
+
+        let statement = Statement::<Bn254> {
+            f: Kzg::<Bn254>::commit_g1(&pk.srs_g1, &witness.f).into()
+        };
+
+        let mut state = State::new(&pk, &index, &table, &witness);
+
+        let m_cm = Prover::round_1(&mut state).unwrap();
+
+        let beta = Fr::rand(&mut rng);
+        let (a_cm, qa_cm, b0_cm, qb_cm, p_cm) = Prover::round_2(&mut state, beta).unwrap();
+
+        let gamma = Fr::rand(&mut rng);
+        let eta = Fr::rand(&mut rng);
+
+        let (b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma) = Prover::round_3(&mut state, gamma, eta).unwrap();
+
+        // verifier part
+        {
+            let N = Fr::from(table.size as u64); 
+            let n_inv = Fr::from(witness.size as u64).inverse().unwrap();
+
+            let b0 = N * a_at_zero * n_inv;
+            let b_at_gamma = b0 + gamma * b0_at_gamma;
+
+            let wtns_domain = GeneralEvaluationDomain::<Fr>::new(witness.size).unwrap();
+            let zh_at_gamma_inv = wtns_domain.evaluate_vanishing_polynomial(gamma).inverse().unwrap();
+
+            let qb_at_gamma = (b_at_gamma * (f_at_gamma + beta) - Fr::one()) * zh_at_gamma_inv;
+
+            let v = b0_at_gamma + eta * f_at_gamma + eta * eta * qb_at_gamma;
+            let mut c = statement.f.mul(eta) + qb_cm.mul(eta * eta);
+            c.add_assign_mixed(&b0_cm);
+            let c = c.into_affine();
+
+            let g_2 = G2Affine::prime_subgroup_generator();
+            let minus_v_g1 = G1Affine::prime_subgroup_generator().mul(v).into_affine().neg();
+
+            let lhs: G1Affine = pi_gamma.mul(gamma).add_mixed(&(c + minus_v_g1)).into();
+            let p1 = Bn254::pairing(lhs, g_2);
+            let p2 = Bn254::pairing(pi_gamma, pk.srs_g2[1]);
+            assert_eq!(p1, p2);
+        }
+
     }
 }

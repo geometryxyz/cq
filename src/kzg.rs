@@ -61,8 +61,7 @@ impl<E: PairingEngine> Kzg<E> {
         srs: &[E::G1Affine],
         polys: &[DensePolynomial<E::Fr>],
         opening_challenge: E::Fr,
-        separation_challenge: E::Fr,
-        bound: Option<usize>,
+        separation_challenge: E::Fr
     ) -> E::G1Affine {
         let powers_of_gamma = iter::successors(Some(separation_challenge), |p| {
             Some(p.clone() * separation_challenge)
@@ -75,14 +74,6 @@ impl<E: PairingEngine> Kzg<E> {
 
         let mut q = &batched
             / &DensePolynomial::from_coefficients_slice(&[-opening_challenge, E::Fr::one()]);
-
-        if let Some(bound) = bound {
-            let d = srs.len() - 1;
-            let s = d - bound + 1;
-
-            let x_upper = x_pow_d::<E::Fr>(s);
-            q = &q * &x_upper;
-        }
 
         if srs.len() - 1 < q.degree() {
             panic!(
