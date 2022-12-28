@@ -1,5 +1,5 @@
 use ark_ec::{AffineCurve, PairingEngine};
-use ark_ff::{Field, One, PrimeField, FftField};
+use ark_ff::{FftField, Field, One, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_std::rand::RngCore;
 use ark_std::UniformRand;
@@ -85,12 +85,19 @@ pub fn construct_lagrange_basis<F: FftField>(evaluation_domain: &[F]) -> Vec<Den
     bases
 }
 
+// TODO: consider this as macro
 pub fn x_pow_d<F: Field>(d: usize) -> DensePolynomial<F> {
     let mut coeffs = vec![F::zero(); d];
     coeffs.push(F::one());
     DensePolynomial::from_coefficients_slice(&coeffs)
 }
 
+// TODO: consider this as macro
 pub fn is_pow_2(x: usize) -> bool {
     (x & (x - 1)) == 0
+}
+
+// TODO: consider this as macro
+pub fn to_field<F: Field>(values: &[u64]) -> Vec<F> {
+    values.iter().map(|&f| F::from(f)).collect()
 }
