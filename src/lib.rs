@@ -6,3 +6,5 @@ pub mod prover;
 pub mod table;
 pub mod tools;
 pub mod utils;
+pub mod rng;
+pub mod transcript;

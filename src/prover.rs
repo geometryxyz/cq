@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{Field, One, Zero};
+use ark_ff::{Field, One, Zero, ToBytes};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial,
 };
@@ -62,13 +62,28 @@ pub struct ProverFirstMessage<E: PairingEngine> {
     pub(crate) m_cm: E::G1Affine
 }
 
+impl<E: PairingEngine> ToBytes for ProverFirstMessage<E> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.m_cm.write(&mut w)
+    }
+}
+
 pub struct ProverSecondMessage<E: PairingEngine> {
     pub(crate) a_cm: E::G1Affine,
     pub(crate) qa_cm: E::G1Affine,
     pub(crate) b0_cm: E::G1Affine,
     pub(crate) qb_cm: E::G1Affine,
     pub(crate) p_cm: E::G1Affine,
+}
 
+impl<E: PairingEngine> ToBytes for ProverSecondMessage<E> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.a_cm.write(&mut w)?;
+        self.qa_cm.write(&mut w)?;
+        self.b0_cm.write(&mut w)?;
+        self.qb_cm.write(&mut w)?;
+        self.p_cm.write(&mut w)
+    }
 }
 
 pub struct ProverThirdMessage<E: PairingEngine> {
@@ -78,6 +93,17 @@ pub struct ProverThirdMessage<E: PairingEngine> {
     pub(crate) pi_gamma: E::G1Affine,
     pub(crate) a0_cm: E::G1Affine,
 }
+
+impl<E: PairingEngine> ToBytes for ProverThirdMessage<E> {
+    fn write<W: std::io::Write>(&self, mut w: W) -> std::io::Result<()> {
+        self.b0_at_gamma.write(&mut w)?;
+        self.f_at_gamma.write(&mut w)?;
+        self.a_at_zero.write(&mut w)?;
+        self.pi_gamma.write(&mut w)?;
+        self.a0_cm.write(&mut w)
+    }
+}
+
 
 impl<E: PairingEngine> Prover<E> {
     pub fn prove() {}
