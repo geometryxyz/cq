@@ -58,10 +58,31 @@ impl<'a, E: PairingEngine> State<'a, E> {
     }
 }
 
+pub struct ProverFirstMessage<E: PairingEngine> {
+    pub(crate) m_cm: E::G1Affine
+}
+
+pub struct ProverSecondMessage<E: PairingEngine> {
+    pub(crate) a_cm: E::G1Affine,
+    pub(crate) qa_cm: E::G1Affine,
+    pub(crate) b0_cm: E::G1Affine,
+    pub(crate) qb_cm: E::G1Affine,
+    pub(crate) p_cm: E::G1Affine,
+
+}
+
+pub struct ProverThirdMessage<E: PairingEngine> {
+    pub(crate) b0_at_gamma: E::Fr,
+    pub(crate) f_at_gamma: E::Fr,
+    pub(crate) a_at_zero: E::Fr,
+    pub(crate) pi_gamma: E::G1Affine,
+    pub(crate) a0_cm: E::G1Affine,
+}
+
 impl<E: PairingEngine> Prover<E> {
     pub fn prove() {}
 
-    pub fn round_1<'a>(state: &'a mut State<E>) -> Result<E::G1Affine, Error> {
+    pub fn round_1<'a>(state: &'a mut State<E>) -> Result<ProverFirstMessage<E>, Error> {
         let mut index_multiplicity_mapping = BTreeMap::<usize, E::Fr>::default();
 
         for fi in &state.witness.f_evals {
@@ -82,20 +103,14 @@ impl<E: PairingEngine> Prover<E> {
         }
 
         state.m_sparse = Some(index_multiplicity_mapping);
-        Ok(m_cm)
+        Ok(ProverFirstMessage { m_cm })
     }
 
     pub fn round_2<'a>(
         state: &'a mut State<E>,
         beta: E::Fr,
     ) -> Result<
-        (
-            E::G1Affine,
-            E::G1Affine,
-            E::G1Affine,
-            E::G1Affine,
-            E::G1Affine,
-        ),
+        ProverSecondMessage<E>,
         Error,
     > {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
@@ -163,10 +178,10 @@ impl<E: PairingEngine> Prover<E> {
         state.a_at_zero = Some(a_at_zero);
         state.a_sparse = Some(a_sparse);
 
-        Ok((a_cm, qa_cm, b0_cm, qb_cm, p_cm))
+        Ok(ProverSecondMessage { a_cm, qa_cm, b0_cm, qb_cm, p_cm })
     }
 
-    pub fn round_3<'a>(state: &'a mut State<E>, gamma: E::Fr, eta: E::Fr) -> Result<(E::Fr, E::Fr, E::Fr, E::G1Affine, E::G1Affine), Error> {
+    pub fn round_3<'a>(state: &'a mut State<E>, gamma: E::Fr, eta: E::Fr) -> Result<ProverThirdMessage<E>, Error> {
         let b0 = state.b0.as_ref().expect("b0 is missing from state");
         let qb = state.qb.as_ref().expect("qb is missing from state");
         let a_sparse = state.a_sparse.as_ref().expect("a missing from state");
@@ -185,7 +200,7 @@ impl<E: PairingEngine> Prover<E> {
         // step 6: compute openings proof
         let pi_gamma: E::G1Affine = Kzg::<E>::batch_open_g1(&state.pk.srs_g1, &[b0.clone(), state.witness.f.clone(), qb.clone()], gamma, eta).into();
 
-        Ok((b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm))
+        Ok(ProverThirdMessage { b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm })
     }
 }
 
@@ -206,7 +221,7 @@ mod prover_rounds_tests {
         utils::{to_field, unsafe_setup_from_rng}, kzg::Kzg,
     };
 
-    use super::{Prover, State};
+    use super::{Prover, State, ProverSecondMessage, ProverThirdMessage};
 
     // TODO: create prepare function for shared data generation
 
@@ -258,10 +273,11 @@ mod prover_rounds_tests {
 
         let mut state = State::new(&pk, &index, &table, &witness);
 
-        let m_cm = Prover::round_1(&mut state).unwrap();
+        let m_cm = Prover::round_1(&mut state).unwrap().m_cm;
 
         let beta = Fr::rand(&mut rng);
-        let (a_cm, qa_cm, b0_cm, _, p_cm) = Prover::round_2(&mut state, beta).unwrap();
+        let second_msg = Prover::round_2(&mut state, beta).unwrap();
+        let ProverSecondMessage { a_cm, qa_cm, b0_cm, qb_cm: _, p_cm } = second_msg;
 
         // check well formation of A
         {
@@ -317,12 +333,14 @@ mod prover_rounds_tests {
         let _ = Prover::round_1(&mut state).unwrap();
 
         let beta = Fr::rand(&mut rng);
-        let (a_cm, _, b0_cm, qb_cm, _) = Prover::round_2(&mut state, beta).unwrap();
+        let second_msg = Prover::round_2(&mut state, beta).unwrap();
+        let ProverSecondMessage { a_cm, qa_cm: _, b0_cm, qb_cm, p_cm: _ } = second_msg;
 
         let gamma = Fr::rand(&mut rng);
         let eta = Fr::rand(&mut rng);
 
-        let (b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm) = Prover::round_3(&mut state, gamma, eta).unwrap();
+        let third_msg = Prover::round_3(&mut state, gamma, eta).unwrap();
+        let ProverThirdMessage { b0_at_gamma, f_at_gamma, a_at_zero, pi_gamma, a0_cm } = third_msg;
 
         // verifier part
         {
