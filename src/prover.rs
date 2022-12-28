@@ -163,12 +163,15 @@ impl<E: PairingEngine> Prover<E> {
         let b0_cm: E::G1Affine = Kzg::<E>::commit_g1(&state.pk.srs_g1, &b0_poly).into();
 
         // step 8: compute QB(X)
-        let qb_evals: Vec<_> = b_evals
+        let b_coset_evals = wtns_domain.coset_fft(&b_poly);
+        let f_coset_evals = wtns_domain.coset_fft(&state.witness.f);
+        let mut qb_evals: Vec<_> = b_coset_evals
             .iter()
-            .zip(state.witness.f_evals.iter())
+            .zip(f_coset_evals.iter())
             .map(|(&bi, &fi)| bi * (fi + beta) - E::Fr::one())
             .collect();
-        let qb_poly = DensePolynomial::from_coefficients_slice(&wtns_domain.ifft(&qb_evals));
+        wtns_domain.divide_by_vanishing_poly_on_coset_in_place(&mut qb_evals);
+        let qb_poly = DensePolynomial::from_coefficients_slice(&wtns_domain.coset_ifft(&qb_evals));
 
         // step 9: commit to QB(X)
         let qb_cm: E::G1Affine = Kzg::<E>::commit_g1(&state.pk.srs_g1, &qb_poly).into();
@@ -215,7 +218,7 @@ mod prover_rounds_tests {
     use ark_bn254::{Bn254, Fr, G2Affine, Fq12, G1Affine};
     use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
     use ark_ff::{UniformRand, One, Field};
-    use ark_poly::{domain::general::GeneralElements, GeneralEvaluationDomain, EvaluationDomain};
+    use ark_poly::{domain::general::GeneralElements, GeneralEvaluationDomain, EvaluationDomain, univariate::DensePolynomial, UVPolynomial};
     use ark_std::{rand::rngs::StdRng, test_rng};
 
     use crate::{
@@ -369,6 +372,5 @@ mod prover_rounds_tests {
             let p2 = Bn254::pairing(pi_gamma, pk.srs_g2[1]);
             assert_eq!(p1, p2);
         }
-
     }
 }
