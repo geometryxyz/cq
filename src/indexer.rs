@@ -81,10 +81,7 @@ mod indexer_tests {
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
 
         let table_values: Vec<_> = (0..n).map(|_| Fr::rand(&mut rng)).collect();
-        let table = Table {
-            size: n,
-            values: table_values,
-        };
+        let table = Table::new(&table_values).unwrap();
 
         let _ = Index::<Bn254>::gen(&srs_g1, &srs_g2, &table);
     }
