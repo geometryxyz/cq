@@ -11,8 +11,8 @@ use crate::{
     error::Error,
     indexer::Index,
     kzg::Kzg,
-    table::{self, Table},
-    utils::{x_pow_d, construct_lagrange_basis},
+    table::Table,
+    utils::x_pow_d,
 };
 
 pub struct Prover<E: PairingEngine> {
@@ -26,7 +26,7 @@ pub struct State<'a, E: PairingEngine> {
     witness: &'a Witness<E::Fr>,
 
     // captured in round_1
-    m_evals: Option<BTreeMap<usize, E::Fr>>,
+    m_sparse: Option<BTreeMap<usize, E::Fr>>,
 
     // captured in round_2
     b0: Option<DensePolynomial<E::Fr>>,
@@ -48,7 +48,7 @@ impl<'a, E: PairingEngine> State<'a, E> {
             table,
             witness,
 
-            m_evals: None,
+            m_sparse: None,
 
             b0: None, 
             qb: None,
@@ -81,7 +81,7 @@ impl<E: PairingEngine> Prover<E> {
                 .into();
         }
 
-        state.m_evals = Some(index_multiplicity_mapping);
+        state.m_sparse = Some(index_multiplicity_mapping);
         Ok(m_cm)
     }
 
@@ -99,55 +99,21 @@ impl<E: PairingEngine> Prover<E> {
         Error,
     > {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
-        let m_evals = state.m_evals.as_ref().expect("m is missing from state");
+        let m_sparse = state.m_sparse.as_ref().expect("m is missing from state");
 
-        let mut a_mapping = BTreeMap::<usize, E::Fr>::default();
+        let mut a_sparse = BTreeMap::<usize, E::Fr>::default();
         let mut a_cm = E::G1Affine::zero();
+        let mut qa_cm = E::G1Affine::zero();
 
-        // step 2&3: computes A sparse representation and a commitment in single pass
-        for (&index, &multiplicity) in m_evals.iter() {
+
+        // step 2&3&4: computes A sparse representation, a commitment and qa commitment in single pass
+        for (&index, &multiplicity) in m_sparse.iter() {
             let a_i = multiplicity * (state.table.values[index] + beta).inverse().unwrap();
-            let _ = a_mapping.insert(index, a_i); // keys are unique so overriding will never occur
+            let _ = a_sparse.insert(index, a_i); // keys are unique so overriding will never occur
 
             a_cm = state.index.ls[index].mul(a_i).add_mixed(&a_cm).into();
-        }
-
-        // TODO: introduce cfg=test, and ask ifcfg = test
-        // sanity 
-        // {
-        //     let table_domain = GeneralEvaluationDomain::<E::Fr>::new(state.table.size).unwrap();
-        //     let zv: DensePolynomial<_> = table_domain.vanishing_polynomial().into();
-
-        //     let roots: Vec<_> = table_domain.elements().collect();
-        //     let lagrange_basis = construct_lagrange_basis(&roots);
-
-        //     let mut m_poly = DensePolynomial::zero();
-        //     for (&index, &multiplicity) in m_evals.iter() {
-        //         m_poly += (multiplicity, &lagrange_basis[index]);
-        //     }
-
-        //     let mut a_poly = DensePolynomial::zero();
-        //     for (&index, &a_i) in a_mapping.iter() {
-        //         a_poly += (a_i, &lagrange_basis[index]);
-        //     }
-
-        //     let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
-
-        //     table_poly[0] += beta;
-        //     let mut num = &a_poly * &table_poly;
-        //     num += (-E::Fr::one(), &m_poly);
-
-        //     let qa = &num / &zv; 
-        //     assert_eq!(num, &qa * &zv);
-        // }
-
-        // HINT: consider computing qa_cm in above loop
-        // step 4: compute [QA(x)]_1
-        let mut qa_cm = E::G1Affine::zero();
-        for (&index, &a_i) in a_mapping.iter() {
             qa_cm = state.index.qs[index].mul(a_i).add_mixed(&qa_cm).into();
         }
-
 
         // step 5: compute B(X)
         let b_evals: Vec<_> = state
@@ -195,7 +161,7 @@ impl<E: PairingEngine> Prover<E> {
         };
 
         state.a_at_zero = Some(a_at_zero);
-        state.a_sparse = Some(a_mapping);
+        state.a_sparse = Some(a_sparse);
 
         Ok((a_cm, qa_cm, b0_cm, qb_cm, p_cm))
     }
@@ -225,12 +191,12 @@ impl<E: PairingEngine> Prover<E> {
 
 #[cfg(test)]
 mod prover_rounds_tests {
-    use std::ops::{Neg, Mul};
+    use std::ops::Neg;
 
     use ark_bn254::{Bn254, Fr, G2Affine, Fq12, G1Affine};
     use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
     use ark_ff::{UniformRand, One, Field};
-    use ark_poly::{domain::general::GeneralElements, GeneralEvaluationDomain, EvaluationDomain, univariate::DensePolynomial, UVPolynomial};
+    use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
     use ark_std::{rand::rngs::StdRng, test_rng};
 
     use crate::{
@@ -266,11 +232,11 @@ mod prover_rounds_tests {
         assert!(res.is_ok());
 
         let keys = vec![1, 3, 4, 7];
-        let supp_m: Vec<usize> = state.m_evals.as_ref().unwrap().keys().map(|&i| i).collect();
+        let supp_m: Vec<usize> = state.m_sparse.as_ref().unwrap().keys().map(|&i| i).collect();
         assert_eq!(keys, supp_m);
 
         let multiplicities = vec![Fr::one(), Fr::one(), Fr::one(), Fr::one()];
-        let m_values: Vec<Fr> = state.m_evals.as_ref().unwrap().values().map(|&mi| mi).collect();
+        let m_values: Vec<Fr> = state.m_sparse.as_ref().unwrap().values().map(|&mi| mi).collect();
         assert_eq!(multiplicities, m_values);
     }
 
@@ -295,7 +261,7 @@ mod prover_rounds_tests {
         let m_cm = Prover::round_1(&mut state).unwrap();
 
         let beta = Fr::rand(&mut rng);
-        let (a_cm, qa_cm, b0_cm, qb_cm, p_cm) = Prover::round_2(&mut state, beta).unwrap();
+        let (a_cm, qa_cm, b0_cm, _, p_cm) = Prover::round_2(&mut state, beta).unwrap();
 
         // check well formation of A
         {
@@ -348,10 +314,10 @@ mod prover_rounds_tests {
 
         let mut state = State::new(&pk, &index, &table, &witness);
 
-        let m_cm = Prover::round_1(&mut state).unwrap();
+        let _ = Prover::round_1(&mut state).unwrap();
 
         let beta = Fr::rand(&mut rng);
-        let (a_cm, qa_cm, b0_cm, qb_cm, p_cm) = Prover::round_2(&mut state, beta).unwrap();
+        let (a_cm, _, b0_cm, qb_cm, _) = Prover::round_2(&mut state, beta).unwrap();
 
         let gamma = Fr::rand(&mut rng);
         let eta = Fr::rand(&mut rng);
@@ -397,3 +363,32 @@ mod prover_rounds_tests {
         }
     }
 }
+
+// TODO: introduce cfg=test, and ask ifcfg = test
+// sanity 
+// {
+//     let table_domain = GeneralEvaluationDomain::<E::Fr>::new(state.table.size).unwrap();
+//     let zv: DensePolynomial<_> = table_domain.vanishing_polynomial().into();
+
+//     let roots: Vec<_> = table_domain.elements().collect();
+//     let lagrange_basis = construct_lagrange_basis(&roots);
+
+//     let mut m_poly = DensePolynomial::zero();
+//     for (&index, &multiplicity) in m_evals.iter() {
+//         m_poly += (multiplicity, &lagrange_basis[index]);
+//     }
+
+//     let mut a_poly = DensePolynomial::zero();
+//     for (&index, &a_i) in a_mapping.iter() {
+//         a_poly += (a_i, &lagrange_basis[index]);
+//     }
+
+//     let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
+
+//     table_poly[0] += beta;
+//     let mut num = &a_poly * &table_poly;
+//     num += (-E::Fr::one(), &m_poly);
+
+//     let qa = &num / &zv; 
+//     assert_eq!(num, &qa * &zv);
+// }

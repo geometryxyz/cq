@@ -72,7 +72,7 @@ impl<E: PairingEngine> Kzg<E> {
             batched += (gamma_pow_i, p_i);
         }
 
-        let mut q = &batched
+        let q = &batched
             / &DensePolynomial::from_coefficients_slice(&[-opening_challenge, E::Fr::one()]);
 
         if srs.len() - 1 < q.degree() {
