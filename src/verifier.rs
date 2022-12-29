@@ -7,8 +7,8 @@ use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
 use crate::{rng::FiatShamirRng, data_structures::{Statement, Proof}, transcript::TranscriptOracle, PROTOCOL_NAME, indexer::CommonPreprocessedInput, error::Error};
 
 pub struct VerifierKey<E: PairingEngine> {
-    pub(crate) x: E::G2Affine,
-    pub(crate) x_pow_b0_bound: E::G2Affine,
+    pub(crate) x: E::G2Prepared,
+    pub(crate) x_pow_b0_bound: E::G2Prepared,
     pub(crate) table_size: usize, 
     pub(crate) witness_size: usize
 }
@@ -16,8 +16,8 @@ pub struct VerifierKey<E: PairingEngine> {
 impl<E: PairingEngine> VerifierKey<E> {
     pub fn new(srs_g2: &[E::G2Affine], table_size: usize, witness_size: usize) -> Self {
         Self {
-            x: srs_g2[1], 
-            x_pow_b0_bound: srs_g2[table_size - witness_size - 1], 
+            x: srs_g2[1].into(), 
+            x_pow_b0_bound: srs_g2[table_size - witness_size - 1].into(), 
             table_size, 
             witness_size
         }
@@ -89,8 +89,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
 
         let res = E::product_of_pairings(&[
             (lhs_batched_1.into(), g_2.into()), 
-            (lhs_batched_x.into(), vk.x.into()), 
-            (proof.second_msg.b0_cm.mul(u_powers[0]).into_affine().into(), vk.x_pow_b0_bound.into()),
+            (lhs_batched_x.into(), vk.x.clone()), 
+            (proof.second_msg.b0_cm.mul(u_powers[0]).into_affine().into(), vk.x_pow_b0_bound.clone()),
             (proof.second_msg.qa_cm.neg().into(), common.zv_2.into()), 
             (proof.second_msg.a_cm.into(), (common.t_2 + beta_2).into()),
         ]);
