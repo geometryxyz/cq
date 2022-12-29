@@ -14,11 +14,7 @@ pub const PROTOCOL_NAME: &[u8] = b"CQ-1.0";
 
 #[cfg(test)]
 mod roundtrip_test {
-    use std::ops::Neg;
-    use ark_bn254::{Bn254, Fq12, Fr, G1Affine, G2Affine};
-    use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-    use ark_ff::{Field, One, UniformRand};
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_bn254::{Bn254, Fr};
     use ark_std::{rand::rngs::StdRng, test_rng};
     use rand_chacha::ChaChaRng;
     use sha3::Keccak256;
@@ -27,7 +23,7 @@ mod roundtrip_test {
         data_structures::{ProvingKey, Statement, Witness},
         indexer::Index,
         kzg::Kzg,
-        prover::{Prover, ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
+        prover::Prover,
         rng::SimpleHashFiatShamirRng,
         table::Table,
         utils::{to_field, unsafe_setup_from_rng},

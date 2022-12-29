@@ -7,8 +7,8 @@ use ark_poly::{
 use crate::{
     kzg::Kzg,
     table::Table,
-    tools::{compute_qs, compute_lagrange_basis_commitments},
-    utils::{construct_lagrange_basis, is_pow_2},
+    tools::{compute_lagrange_basis_commitments, compute_qs},
+    utils::is_pow_2,
 };
 
 pub struct CommonPreprocessedInput<E: PairingEngine> {

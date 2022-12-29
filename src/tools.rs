@@ -13,16 +13,25 @@ pub fn compute_lagrange_basis_commitments<C: AffineCurve>(tau_powers: &[C]) -> V
     assert!(is_pow_2(n));
 
     let domain = GeneralEvaluationDomain::<C::ScalarField>::new(n).unwrap();
-    let n_inv = domain.size_as_field_element().inverse().unwrap().into_repr();
+    let n_inv = domain
+        .size_as_field_element()
+        .inverse()
+        .unwrap()
+        .into_repr();
 
     let tau_projective: Vec<C::Projective> = tau_powers
         .iter()
         .map(|tau_pow_i| tau_pow_i.into_projective())
         .collect();
     let p_evals: Vec<C::Projective> = domain.fft(&tau_projective);
-    let p_evals_reversed: Vec<C::Projective> = iter::once(p_evals[0]).chain(p_evals.into_iter().skip(1).rev()).collect();
+    let p_evals_reversed: Vec<C::Projective> = iter::once(p_evals[0])
+        .chain(p_evals.into_iter().skip(1).rev())
+        .collect();
 
-    let mut ls: Vec<C::Projective> = p_evals_reversed.into_iter().map(|pi| pi.mul(n_inv)).collect();
+    let mut ls: Vec<C::Projective> = p_evals_reversed
+        .into_iter()
+        .map(|pi| pi.mul(n_inv))
+        .collect();
     C::Projective::batch_normalization(&mut ls);
     ls.iter().map(|li| li.into_affine()).collect()
 }
@@ -32,7 +41,7 @@ pub fn compute_qs<E: PairingEngine>(
     domain: &GeneralEvaluationDomain<E::Fr>,
     srs_g1: &[E::G1Affine],
 ) -> Vec<E::G1Affine> {
-    // TODO: implement this in NlogN with the algorithm of Feist and Khovratovich with matrix product
+    // TODO: implement this in NlogN with the algorithm of Feist and Khovratovich https://alinush.github.io/2021/06/17/Feist-Khovratovich-technique-for-computing-KZG-proofs-fast.html#mjx-eqn-eq%3Api-dft
 
     let n = domain.size();
     assert!(t.degree() < n);

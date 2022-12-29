@@ -478,7 +478,7 @@ mod prover_rounds_tests {
 
         // verifier part
         {
-            let N = Fr::from(table.size as u64);
+            let n_table = Fr::from(table.size as u64);
             let n_inv = Fr::from(witness.size as u64).inverse().unwrap();
 
             let b0 = n_table * a_at_zero * n_inv;
