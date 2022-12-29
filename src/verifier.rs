@@ -71,10 +71,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
 
         let witness_domain = GeneralEvaluationDomain::<E::Fr>::new(vk.witness_size).unwrap();
 
-        let N = E::Fr::from(vk.table_size as u64);
+        let n_table = E::Fr::from(vk.table_size as u64);
         let n = E::Fr::from(vk.witness_size as u64);
 
-        let b0 = N * proof.third_msg.a_at_zero * n.inverse().unwrap();
+        let b0 = n_table * proof.third_msg.a_at_zero * n.inverse().unwrap();
         let b_at_gamma = proof.third_msg.b0_at_gamma * gamma + b0;
         let f_at_gamma = proof.third_msg.f_at_gamma;
         let zh_at_gamma = witness_domain.evaluate_vanishing_polynomial(gamma);

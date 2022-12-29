@@ -43,7 +43,7 @@ impl<E: PairingEngine> Index<E> {
 
         // step 3: compute [T(x)]_2
         let table_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&table.values));
-        let t_2: E::G2Affine = Kzg::<E>::commit_g2(&srs_g2, &table_poly).into();
+        let t_2: E::G2Affine = Kzg::<E>::commit_g2(srs_g2, &table_poly).into();
 
         // step 4: compute [Qi(x)]_1
         let qs = compute_qs::<E>(&table_poly, &domain, srs_g1);
@@ -54,7 +54,7 @@ impl<E: PairingEngine> Index<E> {
         let lagrange_basis = construct_lagrange_basis(&roots);
         let lagrange_basis_1: Vec<E::G1Affine> = lagrange_basis
             .iter()
-            .map(|li| Kzg::<E>::commit_g1(&srs_g1, li).into())
+            .map(|li| Kzg::<E>::commit_g1(srs_g1, li).into())
             .collect();
 
         // step 6: compute [(Li(x) - Li(0)) / x]_1
@@ -89,7 +89,7 @@ impl<E: PairingEngine> Index<E> {
 
         // step 3: compute [T(x)]_2
         let table_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&table.values));
-        let t_2: E::G2Affine = Kzg::<E>::commit_g2(&srs_g2, &table_poly).into();
+        let t_2: E::G2Affine = Kzg::<E>::commit_g2(srs_g2, &table_poly).into();
 
         CommonPreprocessedInput { zv_2, t_2 }
     }

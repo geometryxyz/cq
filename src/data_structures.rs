@@ -11,7 +11,6 @@ use crate::{
 
 pub struct ProvingKey<E: PairingEngine> {
     pub(crate) srs_g1: Vec<E::G1Affine>,
-    pub(crate) srs_g2: Vec<E::G2Affine>,
 }
 
 pub struct Statement<E: PairingEngine> {
@@ -37,7 +36,7 @@ impl<F: FftField> Witness<F> {
         }
 
         let domain = GeneralEvaluationDomain::<F>::new(values.len()).unwrap();
-        let f = DensePolynomial::from_coefficients_slice(&domain.ifft(&values));
+        let f = DensePolynomial::from_coefficients_slice(&domain.ifft(values));
 
         Ok(Self {
             size: values.len(),

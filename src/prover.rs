@@ -142,16 +142,16 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    pub fn round_1<'a>(state: &'a mut State<E>) -> Result<ProverFirstMessage<E>, Error> {
+    pub fn round_1(state: &mut State<E>) -> Result<ProverFirstMessage<E>, Error> {
         let mut index_multiplicity_mapping = BTreeMap::<usize, E::Fr>::default();
 
         for fi in &state.witness.f_evals {
             let index = state.table.value_index_mapping.get(fi);
-            let index = index.ok_or(Error::ValueNotInTable(format!("{}", fi)))?;
+            let index = index.ok_or_else(|| Error::ValueNotInTable(format!("{}", fi)))?;
             let multiplicity = index_multiplicity_mapping
                 .entry(*index)
-                .or_insert(E::Fr::zero());
-            *multiplicity = *multiplicity + E::Fr::one();
+                .or_insert_with(E::Fr::zero);
+            *multiplicity += E::Fr::one();
         }
 
         let mut m_cm = E::G1Affine::zero();
@@ -166,10 +166,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         Ok(ProverFirstMessage { m_cm })
     }
 
-    pub fn round_2<'a>(
-        state: &'a mut State<E>,
-        beta: E::Fr,
-    ) -> Result<ProverSecondMessage<E>, Error> {
+    pub fn round_2(state: &mut State<E>, beta: E::Fr) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
         let m_sparse = state.m_sparse.as_ref().expect("m is missing from state");
 
@@ -226,9 +223,9 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             let b_at_zero = b_poly.evaluate(&E::Fr::zero());
             let n = E::Fr::from(state.witness.size as u64);
 
-            let N_inv = E::Fr::from(state.table.size as u64).inverse().unwrap();
+            let n_table_inv = E::Fr::from(state.table.size as u64).inverse().unwrap();
 
-            n * b_at_zero * N_inv
+            n * b_at_zero * n_table_inv
         };
 
         state.a_at_zero = Some(a_at_zero);
@@ -243,8 +240,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    pub fn round_3<'a>(
-        state: &'a mut State<E>,
+    pub fn round_3(
+        state: &mut State<E>,
         gamma: E::Fr,
         eta: E::Fr,
     ) -> Result<ProverThirdMessage<E>, Error> {
@@ -269,8 +266,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             &[b0.clone(), state.witness.f.clone(), qb.clone()],
             gamma,
             eta,
-        )
-        .into();
+        );
 
         Ok(ProverThirdMessage {
             b0_at_gamma,

@@ -3,10 +3,9 @@ use ark_ff::{to_bytes, Field, ToBytes};
 
 use crate::{
     data_structures::Statement,
-    indexer::{CommonPreprocessedInput, Index},
+    indexer::CommonPreprocessedInput,
     prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
     rng::FiatShamirRng,
-    table::Table,
 };
 
 pub struct TranscriptOracle<FS: FiatShamirRng> {
