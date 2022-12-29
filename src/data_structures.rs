@@ -11,6 +11,7 @@ use crate::{
 
 pub struct ProvingKey<E: PairingEngine> {
     pub(crate) srs_g1: Vec<E::G1Affine>,
+    pub(crate) srs_g2: Vec<E::G2Affine>,
 }
 
 pub struct Statement<E: PairingEngine> {

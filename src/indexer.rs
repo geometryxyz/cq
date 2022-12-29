@@ -144,7 +144,7 @@ mod indexer_tests {
         let zero = Fr::zero();
         let li_proofs_slow: Vec<G1Affine> = lagrange_basis
             .iter()
-            .map(|li| Kzg::<Bn254>::open_g1(&srs_g1, li, zero).1.into())
+            .map(|li| Kzg::<Bn254>::open_g1(&srs_g1, li, zero).1)
             .collect();
 
         let rhs = srs_g1[n - 1].mul(-domain.size_as_field_element().inverse().unwrap());
