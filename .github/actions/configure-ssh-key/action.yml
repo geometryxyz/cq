@@ -1,6 +1,0 @@
-name: "Configure SSH key"
-runs:
-  using: "composite"
-  steps: webfactory/ssh-agent@v0.7.0
-    with:
-        ssh-private-key: ${{ secrets.FAST_EVAL_SSH_KEY }}
