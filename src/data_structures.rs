@@ -4,7 +4,10 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 
-use crate::{error::Error, prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage}};
+use crate::{
+    error::Error,
+    prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
+};
 
 pub struct ProvingKey<E: PairingEngine> {
     pub(crate) srs_g1: Vec<E::G1Affine>,
@@ -12,7 +15,7 @@ pub struct ProvingKey<E: PairingEngine> {
 }
 
 pub struct Statement<E: PairingEngine> {
-    pub(crate) f: E::G1Affine
+    pub(crate) f: E::G1Affine,
 }
 
 impl<E: PairingEngine> ToBytes for Statement<E> {

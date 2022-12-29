@@ -61,7 +61,7 @@ impl<E: PairingEngine> Kzg<E> {
         srs: &[E::G1Affine],
         polys: &[DensePolynomial<E::Fr>],
         opening_challenge: E::Fr,
-        separation_challenge: E::Fr
+        separation_challenge: E::Fr,
     ) -> E::G1Affine {
         let powers_of_gamma = iter::successors(Some(separation_challenge), |p| {
             Some(p.clone() * separation_challenge)

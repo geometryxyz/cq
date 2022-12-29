@@ -3,11 +3,11 @@ pub mod error;
 pub mod indexer;
 pub mod kzg;
 pub mod prover;
+pub mod rng;
 pub mod table;
 pub mod tools;
-pub mod utils;
-pub mod rng;
 pub mod transcript;
+pub mod utils;
 pub mod verifier;
 
 pub const PROTOCOL_NAME: &'static [u8] = b"CQ-1.0";
@@ -16,20 +16,23 @@ pub const PROTOCOL_NAME: &'static [u8] = b"CQ-1.0";
 mod roundtrip_test {
     use std::ops::Neg;
 
-    use ark_bn254::{Bn254, Fr, G2Affine, Fq12, G1Affine};
+    use ark_bn254::{Bn254, Fq12, Fr, G1Affine, G2Affine};
     use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
-    use ark_ff::{UniformRand, One, Field};
-    use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
+    use ark_ff::{Field, One, UniformRand};
+    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use ark_std::{rand::rngs::StdRng, test_rng};
     use rand_chacha::ChaChaRng;
     use sha3::Keccak256;
 
     use crate::{
-        data_structures::{ProvingKey, Witness, Statement},
+        data_structures::{ProvingKey, Statement, Witness},
         indexer::Index,
+        kzg::Kzg,
+        prover::{Prover, ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
+        rng::SimpleHashFiatShamirRng,
         table::Table,
-        utils::{to_field, unsafe_setup_from_rng}, kzg::Kzg, rng::SimpleHashFiatShamirRng,
-        prover::{Prover, ProverFirstMessage, ProverSecondMessage, ProverThirdMessage}, verifier::{VerifierKey, Verifier}
+        utils::{to_field, unsafe_setup_from_rng},
+        verifier::{Verifier, VerifierKey},
     };
 
     type FS = SimpleHashFiatShamirRng<Keccak256, ChaChaRng>;
@@ -51,7 +54,7 @@ mod roundtrip_test {
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
 
         let statement = Statement::<Bn254> {
-            f: Kzg::<Bn254>::commit_g1(&pk.srs_g1, &witness.f).into()
+            f: Kzg::<Bn254>::commit_g1(&pk.srs_g1, &witness.f).into(),
         };
 
         let proof = Prover::<Bn254, FS>::prove(&pk, &index, &table, &witness, &statement).unwrap();

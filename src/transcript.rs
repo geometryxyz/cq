@@ -1,25 +1,33 @@
 use ark_ec::PairingEngine;
-use ark_ff::{ToBytes, to_bytes, Field};
+use ark_ff::{to_bytes, Field, ToBytes};
 
-use crate::{rng::FiatShamirRng, prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage}, indexer::{Index, CommonPreprocessedInput}, data_structures::Statement, table::Table};
+use crate::{
+    data_structures::Statement,
+    indexer::{CommonPreprocessedInput, Index},
+    prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
+    rng::FiatShamirRng,
+    table::Table,
+};
 
 pub struct TranscriptOracle<FS: FiatShamirRng> {
-    fs_rng: FS
+    fs_rng: FS,
 }
 
 impl<FS: FiatShamirRng> TranscriptOracle<FS> {
     pub fn initialize<'a, T: 'a + ToBytes>(initial_input: &'a T) -> Self {
         let fs_rng = FS::initialize(&to_bytes![initial_input].unwrap());
-        Self {
-            fs_rng
-        }
+        Self { fs_rng }
     }
 
     pub fn squeeze_challenge<F: Field>(&mut self) -> F {
         F::rand(&mut self.fs_rng)
     }
 
-    pub fn stream_public_input<E: PairingEngine>(&mut self, common: &CommonPreprocessedInput<E>, statement: &Statement<E>) {
+    pub fn stream_public_input<E: PairingEngine>(
+        &mut self,
+        common: &CommonPreprocessedInput<E>,
+        statement: &Statement<E>,
+    ) {
         self.fs_rng.absorb(&to_bytes![common, statement].unwrap());
     }
 

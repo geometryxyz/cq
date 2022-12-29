@@ -66,10 +66,7 @@ impl<E: PairingEngine> Index<E> {
             li_proofs.push((lhs + rhs).into());
         }
 
-        let common = CommonPreprocessedInput {
-            zv_2,
-            t_2
-        };
+        let common = CommonPreprocessedInput { zv_2, t_2 };
 
         Self {
             common,
@@ -79,7 +76,10 @@ impl<E: PairingEngine> Index<E> {
         }
     }
 
-    pub fn compute_common(srs_g2: &[E::G2Affine], table: &Table<E::Fr>) -> CommonPreprocessedInput<E> {
+    pub fn compute_common(
+        srs_g2: &[E::G2Affine],
+        table: &Table<E::Fr>,
+    ) -> CommonPreprocessedInput<E> {
         assert!(is_pow_2(table.size));
         let domain = GeneralEvaluationDomain::<E::Fr>::new(table.size).unwrap();
         // step 2: compute [zV(x)]_2
