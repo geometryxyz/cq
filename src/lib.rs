@@ -38,12 +38,12 @@ mod roundtrip_test {
         let mut rng = test_rng();
 
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1, srs_g2 };
+        let pk = ProvingKey { srs_g1 };
 
         let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
         let table = Table::new(&to_field(&table_values)).unwrap();
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
 
         let witness_values = vec![5, 15, 20, 35];
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
@@ -54,8 +54,8 @@ mod roundtrip_test {
 
         let proof = Prover::<Bn254, FS>::prove(&pk, &index, &table, &witness, &statement).unwrap();
 
-        let vk = VerifierKey::<Bn254>::new(&pk.srs_g2, table.size, witness.size);
-        let common = Index::<Bn254>::compute_common(&pk.srs_g2, &table);
+        let vk = VerifierKey::<Bn254>::new(&srs_g2, table.size, witness.size);
+        let common = Index::<Bn254>::compute_common(&srs_g2, &table);
 
         let res = Verifier::<Bn254, FS>::verify(&vk, &common, &statement, &proof);
         assert!(res.is_ok());

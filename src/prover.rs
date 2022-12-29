@@ -147,10 +147,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
 
         for fi in &state.witness.f_evals {
             let index = state.table.value_index_mapping.get(fi);
-            let index = index.ok_or_else(|| Error::ValueNotInTable(format!("{}", fi)))?;
-            let multiplicity = index_multiplicity_mapping
-                .entry(*index)
-                .or_insert_with(E::Fr::zero);
+            let err_str = format!("{}", fi);
+            let index = index.ok_or(Error::ValueNotInTable(err_str))?;
+            let zero = E::Fr::zero();
+            let multiplicity = index_multiplicity_mapping.entry(*index).or_insert(zero);
             *multiplicity += E::Fr::one();
         }
 
@@ -311,12 +311,12 @@ mod prover_rounds_tests {
         let mut rng = test_rng();
 
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1, srs_g2 };
+        let pk = ProvingKey { srs_g1 };
 
         let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
         let table = Table::new(&to_field(&table_values)).unwrap();
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
 
         let witness_values = vec![5, 15, 20, 35];
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
@@ -334,12 +334,12 @@ mod prover_rounds_tests {
         let mut rng = test_rng();
 
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1, srs_g2 };
+        let pk = ProvingKey { srs_g1 };
 
         let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
         let table = Table::new(&to_field(&table_values)).unwrap();
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
 
         let witness_values = vec![5, 15, 20, 35];
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
@@ -364,12 +364,12 @@ mod prover_rounds_tests {
         let mut rng = test_rng();
 
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1, srs_g2 };
+        let pk = ProvingKey { srs_g1 };
 
         let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
         let table = Table::new(&to_field(&table_values)).unwrap();
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
 
         let witness_values = vec![5, 15, 20, 35];
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
@@ -406,7 +406,7 @@ mod prover_rounds_tests {
         // check b0 degree
         {
             let lhs_0 = b0_cm;
-            let rhs_0 = pk.srs_g2[table.size - witness.size - 1];
+            let rhs_0 = srs_g2[table.size - witness.size - 1];
 
             let lhs_1 = p_cm;
             let rhs_1 = G2Affine::prime_subgroup_generator();
@@ -420,12 +420,12 @@ mod prover_rounds_tests {
         let mut rng = test_rng();
 
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1, srs_g2 };
+        let pk = ProvingKey { srs_g1 };
 
         let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
         let table = Table::new(&to_field(&table_values)).unwrap();
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &pk.srs_g2, &table);
+        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
 
         let witness_values = vec![5, 15, 20, 35];
         let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
@@ -489,7 +489,7 @@ mod prover_rounds_tests {
 
             let lhs: G1Affine = pi_gamma.mul(gamma).add_mixed(&(c + minus_v_g1)).into();
             let p1 = Bn254::pairing(lhs, g_2);
-            let p2 = Bn254::pairing(pi_gamma, pk.srs_g2[1]);
+            let p2 = Bn254::pairing(pi_gamma, srs_g2[1]);
             assert_eq!(p1, p2);
         }
 
@@ -503,7 +503,7 @@ mod prover_rounds_tests {
                 .add_mixed(&a_cm);
 
             let p1 = Bn254::pairing(lhs, g_2);
-            let p2 = Bn254::pairing(a0_cm, pk.srs_g2[1]);
+            let p2 = Bn254::pairing(a0_cm, srs_g2[1]);
             assert_eq!(p1, p2);
         }
     }
