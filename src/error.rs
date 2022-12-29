@@ -5,5 +5,5 @@ pub enum Error {
     DuplicateValueInTable(String),
     ValueNotInTable(String),
 
-    BatchedPairingFailed
+    BatchedPairingFailed,
 }

@@ -25,7 +25,7 @@ impl<E: PairingEngine> Kzg<E> {
             );
         }
         let coeff_scalars: Vec<_> = poly.coeffs.iter().map(|c| c.into_repr()).collect();
-        VariableBaseMSM::multi_scalar_mul(&srs, &coeff_scalars)
+        VariableBaseMSM::multi_scalar_mul(srs, &coeff_scalars)
     }
 
     pub fn commit_g2(srs: &[E::G2Affine], poly: &DensePolynomial<E::Fr>) -> E::G2Projective {
@@ -37,7 +37,7 @@ impl<E: PairingEngine> Kzg<E> {
             );
         }
         let coeff_scalars: Vec<_> = poly.coeffs.iter().map(|c| c.into_repr()).collect();
-        VariableBaseMSM::multi_scalar_mul(&srs, &coeff_scalars)
+        VariableBaseMSM::multi_scalar_mul(srs, &coeff_scalars)
     }
 
     pub fn open_g1(
@@ -61,10 +61,10 @@ impl<E: PairingEngine> Kzg<E> {
         srs: &[E::G1Affine],
         polys: &[DensePolynomial<E::Fr>],
         opening_challenge: E::Fr,
-        separation_challenge: E::Fr
+        separation_challenge: E::Fr,
     ) -> E::G1Affine {
         let powers_of_gamma = iter::successors(Some(separation_challenge), |p| {
-            Some(p.clone() * separation_challenge)
+            Some(*p * separation_challenge)
         });
 
         let mut batched = polys[0].clone();
@@ -95,11 +95,10 @@ impl<E: PairingEngine> Kzg<E> {
         bound: usize,
     ) -> E::G1Affine {
         let n = polys.len();
-        let powers_of_gamma: Vec<E::Fr> = iter::successors(Some(E::Fr::one()), |p| {
-            Some(p.clone() * separation_challenge)
-        })
-        .take(2 * n)
-        .collect();
+        let powers_of_gamma: Vec<E::Fr> =
+            iter::successors(Some(E::Fr::one()), |p| Some(*p * separation_challenge))
+                .take(2 * n)
+                .collect();
 
         let mut batched = DensePolynomial::default();
         for (i, p_i) in polys.iter().enumerate() {

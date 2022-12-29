@@ -20,7 +20,7 @@ pub fn compute_qs<E: PairingEngine>(
     let roots: Vec<_> = domain.elements().collect();
     let ks: Vec<E::G1Affine> = roots
         .iter()
-        .map(|&g_i| Kzg::<E>::open_g1(&srs_g1, t, g_i).1.into())
+        .map(|&g_i| Kzg::<E>::open_g1(srs_g1, t, g_i).1)
         .collect();
 
     let n_inv = domain.size_as_field_element().inverse().unwrap();

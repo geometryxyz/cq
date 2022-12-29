@@ -43,7 +43,7 @@ impl<E: PairingEngine> Index<E> {
 
         // step 3: compute [T(x)]_2
         let table_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&table.values));
-        let t_2: E::G2Affine = Kzg::<E>::commit_g2(&srs_g2, &table_poly).into();
+        let t_2: E::G2Affine = Kzg::<E>::commit_g2(srs_g2, &table_poly).into();
 
         // step 4: compute [Qi(x)]_1
         let qs = compute_qs::<E>(&table_poly, &domain, srs_g1);
@@ -54,7 +54,7 @@ impl<E: PairingEngine> Index<E> {
         let lagrange_basis = construct_lagrange_basis(&roots);
         let lagrange_basis_1: Vec<E::G1Affine> = lagrange_basis
             .iter()
-            .map(|li| Kzg::<E>::commit_g1(&srs_g1, li).into())
+            .map(|li| Kzg::<E>::commit_g1(srs_g1, li).into())
             .collect();
 
         // step 6: compute [(Li(x) - Li(0)) / x]_1
@@ -66,10 +66,7 @@ impl<E: PairingEngine> Index<E> {
             li_proofs.push((lhs + rhs).into());
         }
 
-        let common = CommonPreprocessedInput {
-            zv_2,
-            t_2
-        };
+        let common = CommonPreprocessedInput { zv_2, t_2 };
 
         Self {
             common,
@@ -79,7 +76,10 @@ impl<E: PairingEngine> Index<E> {
         }
     }
 
-    pub fn compute_common(srs_g2: &[E::G2Affine], table: &Table<E::Fr>) -> CommonPreprocessedInput<E> {
+    pub fn compute_common(
+        srs_g2: &[E::G2Affine],
+        table: &Table<E::Fr>,
+    ) -> CommonPreprocessedInput<E> {
         assert!(is_pow_2(table.size));
         let domain = GeneralEvaluationDomain::<E::Fr>::new(table.size).unwrap();
         // step 2: compute [zV(x)]_2
@@ -89,7 +89,7 @@ impl<E: PairingEngine> Index<E> {
 
         // step 3: compute [T(x)]_2
         let table_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&table.values));
-        let t_2: E::G2Affine = Kzg::<E>::commit_g2(&srs_g2, &table_poly).into();
+        let t_2: E::G2Affine = Kzg::<E>::commit_g2(srs_g2, &table_poly).into();
 
         CommonPreprocessedInput { zv_2, t_2 }
     }
@@ -144,7 +144,7 @@ mod indexer_tests {
         let zero = Fr::zero();
         let li_proofs_slow: Vec<G1Affine> = lagrange_basis
             .iter()
-            .map(|li| Kzg::<Bn254>::open_g1(&srs_g1, li, zero).1.into())
+            .map(|li| Kzg::<Bn254>::open_g1(&srs_g1, li, zero).1)
             .collect();
 
         let rhs = srs_g1[n - 1].mul(-domain.size_as_field_element().inverse().unwrap());

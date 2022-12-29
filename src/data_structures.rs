@@ -4,15 +4,17 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 
-use crate::{error::Error, prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage}};
+use crate::{
+    error::Error,
+    prover::{ProverFirstMessage, ProverSecondMessage, ProverThirdMessage},
+};
 
 pub struct ProvingKey<E: PairingEngine> {
     pub(crate) srs_g1: Vec<E::G1Affine>,
-    pub(crate) srs_g2: Vec<E::G2Affine>,
 }
 
 pub struct Statement<E: PairingEngine> {
-    pub(crate) f: E::G1Affine
+    pub(crate) f: E::G1Affine,
 }
 
 impl<E: PairingEngine> ToBytes for Statement<E> {
@@ -34,7 +36,7 @@ impl<F: FftField> Witness<F> {
         }
 
         let domain = GeneralEvaluationDomain::<F>::new(values.len()).unwrap();
-        let f = DensePolynomial::from_coefficients_slice(&domain.ifft(&values));
+        let f = DensePolynomial::from_coefficients_slice(&domain.ifft(values));
 
         Ok(Self {
             size: values.len(),

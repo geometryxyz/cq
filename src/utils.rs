@@ -13,7 +13,7 @@ pub fn unsafe_setup_from_rng<E: PairingEngine, R: RngCore>(
 ) -> (Vec<E::G1Affine>, Vec<E::G2Affine>) {
     let tau = E::Fr::rand(rng);
     let size = max(max_power_g1 + 1, max_power_g2 + 1);
-    let powers_of_tau: Vec<E::Fr> = iter::successors(Some(E::Fr::one()), |p| Some(p.clone() * tau))
+    let powers_of_tau: Vec<E::Fr> = iter::successors(Some(E::Fr::one()), |p| Some(*p * tau))
         .take(size)
         .collect();
 
@@ -41,7 +41,7 @@ pub fn unsafe_setup_from_tau<E: PairingEngine, R: RngCore>(
     tau: E::Fr,
 ) -> (Vec<E::G1Affine>, Vec<E::G2Affine>) {
     let size = max(max_power_g1 + 1, max_power_g2 + 1);
-    let powers_of_tau: Vec<E::Fr> = iter::successors(Some(E::Fr::one()), |p| Some(p.clone() * tau))
+    let powers_of_tau: Vec<E::Fr> = iter::successors(Some(E::Fr::one()), |p| Some(*p * tau))
         .take(size)
         .collect();
 
@@ -68,7 +68,7 @@ pub fn construct_lagrange_basis<F: FftField>(evaluation_domain: &[F]) -> Vec<Den
     for i in 0..evaluation_domain.len() {
         let mut l_i = DensePolynomial::from_coefficients_slice(&[F::one()]);
         let x_i = evaluation_domain[i];
-        for j in 0..evaluation_domain.len() {
+        for (j, _) in evaluation_domain.iter().enumerate() {
             if j != i {
                 let xi_minus_xj_inv = (x_i - evaluation_domain[j]).inverse().unwrap();
                 l_i = &l_i
