@@ -166,7 +166,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         Ok(ProverFirstMessage { m_cm })
     }
 
-    pub fn round_2(state: &mut State<E>, beta: E::Fr) -> Result<ProverSecondMessage<E>, Error> {
+    pub fn round_2<'a>(
+        state: &'a mut State<E>,
+        beta: E::Fr,
+    ) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
         let m_sparse = state.m_sparse.as_ref().expect("m is missing from state");
 
@@ -240,8 +243,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    pub fn round_3(
-        state: &mut State<E>,
+    pub fn round_3<'a>(
+        state: &'a mut State<E>,
         gamma: E::Fr,
         eta: E::Fr,
     ) -> Result<ProverThirdMessage<E>, Error> {
@@ -266,7 +269,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             &[b0.clone(), state.witness.f.clone(), qb.clone()],
             gamma,
             eta,
-        );
+        )
+        .into();
 
         Ok(ProverThirdMessage {
             b0_at_gamma,
@@ -350,11 +354,23 @@ mod prover_rounds_tests {
         assert!(res.is_ok());
 
         let keys = vec![1, 3, 4, 7];
-        let supp_m: Vec<usize> = state.m_sparse.as_ref().unwrap().keys().copied().collect();
+        let supp_m: Vec<usize> = state
+            .m_sparse
+            .as_ref()
+            .unwrap()
+            .keys()
+            .map(|&i| i)
+            .collect();
         assert_eq!(keys, supp_m);
 
         let multiplicities = vec![Fr::one(), Fr::one(), Fr::one(), Fr::one()];
-        let m_values: Vec<Fr> = state.m_sparse.as_ref().unwrap().values().copied().collect();
+        let m_values: Vec<Fr> = state
+            .m_sparse
+            .as_ref()
+            .unwrap()
+            .values()
+            .map(|&mi| mi)
+            .collect();
         assert_eq!(multiplicities, m_values);
     }
 
@@ -462,7 +478,7 @@ mod prover_rounds_tests {
 
         // verifier part
         {
-            let n_table = Fr::from(table.size as u64);
+            let N = Fr::from(table.size as u64);
             let n_inv = Fr::from(witness.size as u64).inverse().unwrap();
 
             let b0 = n_table * a_at_zero * n_inv;

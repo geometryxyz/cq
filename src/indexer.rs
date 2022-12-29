@@ -7,7 +7,7 @@ use ark_poly::{
 use crate::{
     kzg::Kzg,
     table::Table,
-    tools::compute_qs,
+    tools::{compute_qs, compute_lagrange_basis_commitments},
     utils::{construct_lagrange_basis, is_pow_2},
 };
 
@@ -49,13 +49,7 @@ impl<E: PairingEngine> Index<E> {
         let qs = compute_qs::<E>(&table_poly, &domain, srs_g1);
 
         // step 5: compute [Li(x)]_1
-        // TODO: this should be done in NlogN from https://eprint.iacr.org/2017/602.pdf(3.3)
-        let roots: Vec<_> = domain.elements().collect();
-        let lagrange_basis = construct_lagrange_basis(&roots);
-        let lagrange_basis_1: Vec<E::G1Affine> = lagrange_basis
-            .iter()
-            .map(|li| Kzg::<E>::commit_g1(srs_g1, li).into())
-            .collect();
+        let lagrange_basis_1: Vec<E::G1Affine> = compute_lagrange_basis_commitments(srs_g1);
 
         // step 6: compute [(Li(x) - Li(0)) / x]_1
         // commit to all zero openings of lagrange basis
