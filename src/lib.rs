@@ -73,11 +73,11 @@ mod roundtrip_test {
     #[test]
     fn test_roundtrip() {
         let two: usize = 2;
-        let n = two.pow(9);
+        let n = two.pow(6);
 
         let mut rng = test_rng();
 
-        let witness_size = two.pow(5);
+        let witness_size = two.pow(3);
         let subvector_indices: Vec<usize> =
             (0..witness_size).map(|_| rng.gen_range(0..n - 1)).collect();
 
