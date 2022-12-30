@@ -558,32 +558,3 @@ mod prover_rounds_tests {
         }
     }
 }
-
-// TODO: introduce cfg=test, and ask ifcfg = test
-// sanity
-// {
-//     let table_domain = GeneralEvaluationDomain::<E::Fr>::new(state.table.size).unwrap();
-//     let zv: DensePolynomial<_> = table_domain.vanishing_polynomial().into();
-
-//     let roots: Vec<_> = table_domain.elements().collect();
-//     let lagrange_basis = construct_lagrange_basis(&roots);
-
-//     let mut m_poly = DensePolynomial::zero();
-//     for (&index, &multiplicity) in m_evals.iter() {
-//         m_poly += (multiplicity, &lagrange_basis[index]);
-//     }
-
-//     let mut a_poly = DensePolynomial::zero();
-//     for (&index, &a_i) in a_mapping.iter() {
-//         a_poly += (a_i, &lagrange_basis[index]);
-//     }
-
-//     let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
-
-//     table_poly[0] += beta;
-//     let mut num = &a_poly * &table_poly;
-//     num += (-E::Fr::one(), &m_poly);
-
-//     let qa = &num / &zv;
-//     assert_eq!(num, &qa * &zv);
-// }
