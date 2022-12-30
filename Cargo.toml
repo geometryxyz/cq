@@ -17,3 +17,4 @@ rand_chacha = { version = "0.3.0", default-features = false }
 
 [features]
 debug = []
+sanity = []

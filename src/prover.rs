@@ -171,7 +171,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         beta: E::Fr,
     ) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
-        let m_sparse = state.m_sparse.as_ref().expect("m is missing from state");
+        let m_sparse = state.m_sparse.as_ref().expect("m is missing from the state");
 
         let mut a_sparse = BTreeMap::<usize, E::Fr>::default();
         let mut a_cm = E::G1Affine::zero();
@@ -234,6 +234,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         state.a_at_zero = Some(a_at_zero);
         state.a_sparse = Some(a_sparse);
 
+        if cfg!(feature = "sanity") {
+            Self::sanity_check_function(state, beta);
+        }
+
         Ok(ProverSecondMessage {
             a_cm,
             qa_cm,
@@ -248,9 +252,9 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         gamma: E::Fr,
         eta: E::Fr,
     ) -> Result<ProverThirdMessage<E>, Error> {
-        let b0 = state.b0.as_ref().expect("b0 is missing from state");
-        let qb = state.qb.as_ref().expect("qb is missing from state");
-        let a_sparse = state.a_sparse.as_ref().expect("a missing from state");
+        let b0 = state.b0.as_ref().expect("b0 is missing from the state");
+        let qb = state.qb.as_ref().expect("qb is missing from the state");
+        let a_sparse = state.a_sparse.as_ref().expect("a missing from the state");
         let a_at_zero = state.a_at_zero.expect("a at 0 missing from the state");
 
         // step 2: compute openings of b0 and f
@@ -279,6 +283,36 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             pi_gamma,
             a0_cm,
         })
+    }
+
+    fn sanity_check_function<'a>(state: &'a State<E>, beta: E::Fr) {
+        let m_sparse = state.m_sparse.as_ref().expect("m missing from the state");
+        let a_sparse = state.a_sparse.as_ref().expect("a missing from the state");
+
+        let table_domain = GeneralEvaluationDomain::<E::Fr>::new(state.table.size).unwrap();
+        let zv: DensePolynomial<_> = table_domain.vanishing_polynomial().into();
+
+        let roots: Vec<_> = table_domain.elements().collect();
+        let lagrange_basis = crate::utils::construct_lagrange_basis(&roots);
+
+        let mut m_poly = DensePolynomial::zero();
+        for (&index, &multiplicity) in m_sparse.iter() {
+            m_poly += (multiplicity, &lagrange_basis[index]);
+        }
+
+        let mut a_poly = DensePolynomial::zero();
+        for (&index, &a_i) in a_sparse.iter() {
+            a_poly += (a_i, &lagrange_basis[index]);
+        }
+
+        let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
+
+        table_poly[0] += beta;
+        let mut num = &a_poly * &table_poly;
+        num += (-E::Fr::one(), &m_poly);
+
+        let qa = &num / &zv;
+        assert_eq!(num, &qa * &zv);
     }
 }
 
