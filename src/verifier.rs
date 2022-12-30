@@ -121,7 +121,58 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
         ]);
 
         if res != E::Fqk::one() {
-            return Err(Error::BatchedPairingFailed);
+            if cfg!(feature = "debug") {
+                // check well formation of A
+                {
+                    let res = E::product_of_pairings(&[
+                        (proof.second_msg.a_cm.into(), (common.t_2 + beta_2).into()),
+                        (proof.second_msg.qa_cm.neg().into(), common.zv_2.into()),
+                        (proof.first_msg.m_cm.neg().into(), g_2.into()),
+                    ]);
+
+                    if res != E::Fqk::one() {
+                        return Err(Error::Pairing1Failed);
+                    }
+                }
+
+                // check b0 degree
+                {
+                    let res = E::product_of_pairings(&[
+                        (proof.second_msg.b0_cm.into(), vk.x_pow_b0_bound.clone()),
+                        (proof.second_msg.p_cm.neg().into(), g_2.into()),
+                    ]);
+
+                    if res != E::Fqk::one() {
+                        return Err(Error::Pairing2Failed);
+                    }
+                }
+
+                // check openings at gamma
+                {
+                    let res = E::product_of_pairings(&[
+                        (l.into(), g_2.into()),
+                        (proof.third_msg.pi_gamma.neg().into(), vk.x.clone())
+                    ]);
+
+                    if res != E::Fqk::one() {
+                        return Err(Error::Pairing3Failed);
+                    }
+                }
+
+                // check a opening at zero 
+                {
+                    let res = E::product_of_pairings(&[
+                        (a_pt.into(), g_2.into()),
+                        (proof.third_msg.a0_cm.neg().into(), vk.x.clone())
+                    ]);
+
+                    if res != E::Fqk::one() {
+                        return Err(Error::Pairing4Failed);
+                    }
+                }
+            } else {
+                return Err(Error::BatchedPairingFailed);
+            }
         }
 
         Ok(())

@@ -6,4 +6,9 @@ pub enum Error {
     ValueNotInTable(String),
 
     BatchedPairingFailed,
+
+    Pairing1Failed,
+    Pairing2Failed,
+    Pairing3Failed,
+    Pairing4Failed,
 }
