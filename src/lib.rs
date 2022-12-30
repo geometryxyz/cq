@@ -14,49 +14,77 @@ pub const PROTOCOL_NAME: &[u8] = b"CQ-1.0";
 
 #[cfg(test)]
 mod roundtrip_test {
-    use ark_bn254::{Bn254, Fr};
-    use ark_std::{rand::rngs::StdRng, test_rng};
+    use ark_bn254::Bn254;
+    use ark_ec::PairingEngine;
+    use ark_std::{
+        rand::{rngs::StdRng, Rng, RngCore},
+        test_rng, UniformRand,
+    };
     use rand_chacha::ChaChaRng;
     use sha3::Keccak256;
 
     use crate::{
         data_structures::{ProvingKey, Statement, Witness},
-        indexer::Index,
+        indexer::{CommonPreprocessedInput, Index},
         kzg::Kzg,
         prover::Prover,
         rng::SimpleHashFiatShamirRng,
         table::Table,
-        utils::{to_field, unsafe_setup_from_rng},
+        utils::unsafe_setup_from_rng,
         verifier::{Verifier, VerifierKey},
     };
 
     type FS = SimpleHashFiatShamirRng<Keccak256, ChaChaRng>;
 
-    #[test]
-    fn test_full_protocol() {
-        let n = 8;
-        let mut rng = test_rng();
+    fn prepare<E: PairingEngine, R: RngCore>(
+        n: usize,
+        subvector_indices: &[usize],
+        rng: &mut R,
+    ) -> (
+        Table<E::Fr>,
+        Index<E>,
+        Statement<E>,
+        CommonPreprocessedInput<E>,
+        ProvingKey<E>,
+        VerifierKey<E>,
+        Witness<E::Fr>,
+    ) {
+        let (srs_g1, srs_g2) = unsafe_setup_from_rng::<E, R>(n - 1, n, rng);
+        let pk = ProvingKey::<E> { srs_g1 };
 
-        let (srs_g1, srs_g2) = unsafe_setup_from_rng::<Bn254, StdRng>(n - 1, n, &mut rng);
-        let pk = ProvingKey { srs_g1 };
+        let table_values: Vec<_> = (0..n).map(|_| E::Fr::rand(rng)).collect();
+        let table = Table::new(&table_values).unwrap();
 
-        let table_values = vec![1, 5, 10, 15, 20, 25, 30, 35];
-        let table = Table::new(&to_field(&table_values)).unwrap();
+        let index = Index::<E>::gen(&pk.srs_g1, &srs_g2, &table);
 
-        let index = Index::<Bn254>::gen(&pk.srs_g1, &srs_g2, &table);
+        let witness_values: Vec<_> = subvector_indices.iter().map(|&i| table_values[i]).collect();
+        let witness = Witness::<E::Fr>::new(&witness_values).unwrap();
 
-        let witness_values = vec![5, 15, 20, 35];
-        let witness = Witness::<Fr>::new(&to_field(&witness_values)).unwrap();
-
-        let statement = Statement::<Bn254> {
-            f: Kzg::<Bn254>::commit_g1(&pk.srs_g1, &witness.f).into(),
+        let statement = Statement::<E> {
+            f: Kzg::<E>::commit_g1(&pk.srs_g1, &witness.f).into(),
         };
 
+        let vk = VerifierKey::<E>::new(&srs_g2, table.size, witness.size);
+        let common = Index::<E>::compute_common(&srs_g2, &table);
+
+        (table, index, statement, common, pk, vk, witness)
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        let two: usize = 2;
+        let n = two.pow(9);
+
+        let mut rng = test_rng();
+
+        let witness_size = two.pow(5);
+        let subvector_indices: Vec<usize> =
+            (0..witness_size).map(|_| rng.gen_range(0..n - 1)).collect();
+
+        let (table, index, statement, common, pk, vk, witness) =
+            prepare::<Bn254, StdRng>(n, &subvector_indices, &mut rng);
+
         let proof = Prover::<Bn254, FS>::prove(&pk, &index, &table, &witness, &statement).unwrap();
-
-        let vk = VerifierKey::<Bn254>::new(&srs_g2, table.size, witness.size);
-        let common = Index::<Bn254>::compute_common(&srs_g2, &table);
-
         let res = Verifier::<Bn254, FS>::verify(&vk, &common, &statement, &proof);
         assert!(res.is_ok());
     }

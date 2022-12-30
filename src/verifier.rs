@@ -151,7 +151,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
                 {
                     let res = E::product_of_pairings(&[
                         (l.into(), g_2.into()),
-                        (proof.third_msg.pi_gamma.neg().into(), vk.x.clone())
+                        (proof.third_msg.pi_gamma.neg().into(), vk.x.clone()),
                     ]);
 
                     if res != E::Fqk::one() {
@@ -159,11 +159,11 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
                     }
                 }
 
-                // check a opening at zero 
+                // check a opening at zero
                 {
                     let res = E::product_of_pairings(&[
                         (a_pt.into(), g_2.into()),
-                        (proof.third_msg.a0_cm.neg().into(), vk.x.clone())
+                        (proof.third_msg.a0_cm.neg().into(), vk.x.clone()),
                     ]);
 
                     if res != E::Fqk::one() {
