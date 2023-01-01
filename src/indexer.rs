@@ -47,7 +47,6 @@ impl<E: PairingEngine> Index<E> {
 
         // step 4: compute [Qi(x)]_1
         let qs = compute_qs::<E>(&table_poly, &domain, srs_g1);
-
         // step 5: compute [Li(x)]_1
         let lagrange_basis_1: Vec<E::G1Affine> = compute_lagrange_basis_commitments(srs_g1);
 

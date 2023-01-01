@@ -10,6 +10,7 @@ ark-poly = "0.3.0"
 ark-ec = "0.3.0"
 ark-std = "0.3.0"
 sha3 = "0.10.6"
+fk = { git = "ssh://git@github.com/geometryresearch/fk.git" }
 
 [dev-dependencies]
 ark-bn254 = "0.3.0"
