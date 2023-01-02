@@ -165,8 +165,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         Ok(ProverFirstMessage { m_cm })
     }
 
-    pub fn round_2<'a>(
-        state: &'a mut State<E>,
+    pub fn round_2(
+        state: &mut State<E>,
         beta: E::Fr,
     ) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
@@ -288,7 +288,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    fn sanity_check_function<'a>(state: &'a State<E>, beta: E::Fr) {
+    fn sanity_check_function(state: &State<E>, beta: E::Fr) {
         let m_sparse = state.m_sparse.as_ref().expect("m missing from the state");
         let a_sparse = state.a_sparse.as_ref().expect("a missing from the state");
 
