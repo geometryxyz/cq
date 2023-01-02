@@ -170,7 +170,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         beta: E::Fr,
     ) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
-        let m_sparse = state.m_sparse.as_ref().expect("m is missing from the state");
+        let m_sparse = state
+            .m_sparse
+            .as_ref()
+            .expect("m is missing from the state");
 
         let mut a_sparse = BTreeMap::<usize, E::Fr>::default();
         let mut a_cm = E::G1Affine::zero();
@@ -306,7 +309,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             a_poly += (a_i, &lagrange_basis[index]);
         }
 
-        let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
+        let mut table_poly =
+            DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
 
         table_poly[0] += beta;
         let mut num = &a_poly * &table_poly;
