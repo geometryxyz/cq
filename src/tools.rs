@@ -2,11 +2,10 @@ use std::iter;
 
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, PrimeField};
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use fk::UpperToeplitz;
 
-use crate::{kzg::Kzg, utils::is_pow_2};
+use crate::utils::is_pow_2;
 
 pub fn compute_lagrange_basis_commitments<C: AffineCurve>(tau_powers: &[C]) -> Vec<C> {
     let n = tau_powers.len();
@@ -24,9 +23,7 @@ pub fn compute_lagrange_basis_commitments<C: AffineCurve>(tau_powers: &[C]) -> V
         .map(|tau_pow_i| tau_pow_i.into_projective())
         .collect();
     let p_evals: Vec<C::Projective> = domain.fft(&tau_projective);
-    let p_evals_reversed: Vec<C::Projective> = iter::once(p_evals[0])
-        .chain(p_evals.into_iter().skip(1).rev())
-        .collect();
+    let p_evals_reversed = iter::once(p_evals[0]).chain(p_evals.into_iter().skip(1).rev());
 
     let mut ls: Vec<C::Projective> = p_evals_reversed
         .into_iter()
@@ -41,25 +38,32 @@ pub fn compute_qs<E: PairingEngine>(
     domain: &GeneralEvaluationDomain<E::Fr>,
     srs_g1: &[E::G1Affine],
 ) -> Vec<E::G1Affine> {
-    // TODO: implement this in NlogN with the algorithm of Feist and Khovratovich https://alinush.github.io/2021/06/17/Feist-Khovratovich-technique-for-computing-KZG-proofs-fast.html#mjx-eqn-eq%3Api-dft
+    /*
+        - N (table size) is always pow2
+        - Toeplitz multiplication will happen in 2 * N, so appending zero commitments on hs is not needed
+    */
 
-    let n = domain.size();
-    assert!(t.degree() < n);
-    assert_eq!(srs_g1.len(), n); // x^0, ..., x^(n-1)
+    let toeplitz = UpperToeplitz::from_poly(t);
 
-    let roots: Vec<_> = domain.elements().collect();
-    let ks: Vec<E::G1Affine> = roots
-        .iter()
-        .map(|&g_i| Kzg::<E>::open_g1(srs_g1, t, g_i).1)
-        .collect();
+    let mut srs_proj: Vec<E::G1Projective> = srs_g1.iter().map(|t| t.into_projective()).collect();
+    srs_proj.reverse();
+
+    let h_commitments: Vec<E::G1Projective> = toeplitz.mul_by_vec(&srs_proj);
+    assert_eq!(h_commitments.len(), 2 * domain.size());
+
+    let ks: Vec<_> = domain.fft(&toeplitz.mul_by_vec(&srs_proj)[..domain.size()]);
 
     let n_inv = domain.size_as_field_element().inverse().unwrap();
-    let normalized_roots: Vec<_> = roots.iter().map(|&g_i| g_i * n_inv).collect();
+    let normalized_roots = domain.elements().map(|g_i| g_i * n_inv);
 
-    ks.iter()
-        .zip(normalized_roots.iter())
-        .map(|(ki, &normalizer_i)| ki.mul(normalizer_i).into())
-        .collect()
+    let mut qs: Vec<E::G1Projective> = ks
+        .iter()
+        .zip(normalized_roots)
+        .map(|(ki, normalizer_i)| ki.mul(normalizer_i.into_repr()))
+        .collect();
+
+    E::G1Projective::batch_normalization(&mut qs);
+    qs.iter().map(|qi| qi.into_affine()).collect()
 }
 
 #[cfg(test)]

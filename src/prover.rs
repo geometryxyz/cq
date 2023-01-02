@@ -165,12 +165,12 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         Ok(ProverFirstMessage { m_cm })
     }
 
-    pub fn round_2<'a>(
-        state: &'a mut State<E>,
-        beta: E::Fr,
-    ) -> Result<ProverSecondMessage<E>, Error> {
+    pub fn round_2(state: &mut State<E>, beta: E::Fr) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
-        let m_sparse = state.m_sparse.as_ref().expect("m is missing from the state");
+        let m_sparse = state
+            .m_sparse
+            .as_ref()
+            .expect("m is missing from the state");
 
         let mut a_sparse = BTreeMap::<usize, E::Fr>::default();
         let mut a_cm = E::G1Affine::zero();
@@ -248,8 +248,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    pub fn round_3<'a>(
-        state: &'a mut State<E>,
+    pub fn round_3(
+        state: &mut State<E>,
         gamma: E::Fr,
         eta: E::Fr,
     ) -> Result<ProverThirdMessage<E>, Error> {
@@ -274,8 +274,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             &[b0.clone(), state.witness.f.clone(), qb.clone()],
             gamma,
             eta,
-        )
-        .into();
+        );
 
         Ok(ProverThirdMessage {
             b0_at_gamma,
@@ -286,7 +285,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    fn sanity_check_function<'a>(state: &'a State<E>, beta: E::Fr) {
+    fn sanity_check_function(state: &State<E>, beta: E::Fr) {
         let m_sparse = state.m_sparse.as_ref().expect("m missing from the state");
         let a_sparse = state.a_sparse.as_ref().expect("a missing from the state");
 
@@ -306,7 +305,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             a_poly += (a_i, &lagrange_basis[index]);
         }
 
-        let mut table_poly = DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
+        let mut table_poly =
+            DensePolynomial::from_coefficients_slice(&table_domain.ifft(&state.table.values));
 
         table_poly[0] += beta;
         let mut num = &a_poly * &table_poly;
@@ -389,23 +389,11 @@ mod prover_rounds_tests {
         assert!(res.is_ok());
 
         let keys = vec![1, 3, 4, 7];
-        let supp_m: Vec<usize> = state
-            .m_sparse
-            .as_ref()
-            .unwrap()
-            .keys()
-            .map(|&i| i)
-            .collect();
+        let supp_m: Vec<usize> = state.m_sparse.as_ref().unwrap().keys().copied().collect();
         assert_eq!(keys, supp_m);
 
         let multiplicities = vec![Fr::one(), Fr::one(), Fr::one(), Fr::one()];
-        let m_values: Vec<Fr> = state
-            .m_sparse
-            .as_ref()
-            .unwrap()
-            .values()
-            .map(|&mi| mi)
-            .collect();
+        let m_values: Vec<Fr> = state.m_sparse.as_ref().unwrap().values().copied().collect();
         assert_eq!(multiplicities, m_values);
     }
 

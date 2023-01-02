@@ -35,20 +35,21 @@ mod roundtrip_test {
     };
 
     type FS = SimpleHashFiatShamirRng<Keccak256, ChaChaRng>;
-
-    fn prepare<E: PairingEngine, R: RngCore>(
-        n: usize,
-        subvector_indices: &[usize],
-        rng: &mut R,
-    ) -> (
-        Table<E::Fr>,
+    type PrepareResult<E> = (
+        Table<<E as PairingEngine>::Fr>,
         Index<E>,
         Statement<E>,
         CommonPreprocessedInput<E>,
         ProvingKey<E>,
         VerifierKey<E>,
-        Witness<E::Fr>,
-    ) {
+        Witness<<E as PairingEngine>::Fr>,
+    );
+
+    fn prepare<E: PairingEngine, R: RngCore>(
+        n: usize,
+        subvector_indices: &[usize],
+        rng: &mut R,
+    ) -> PrepareResult<E> {
         let (srs_g1, srs_g2) = unsafe_setup_from_rng::<E, R>(n - 1, n, rng);
         let pk = ProvingKey::<E> { srs_g1 };
 
