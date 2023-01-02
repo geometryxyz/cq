@@ -251,8 +251,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         })
     }
 
-    pub fn round_3<'a>(
-        state: &'a mut State<E>,
+    pub fn round_3(
+        state: &mut State<E>,
         gamma: E::Fr,
         eta: E::Fr,
     ) -> Result<ProverThirdMessage<E>, Error> {
@@ -277,8 +277,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
             &[b0.clone(), state.witness.f.clone(), qb.clone()],
             gamma,
             eta,
-        )
-        .into();
+        );
 
         Ok(ProverThirdMessage {
             b0_at_gamma,
@@ -397,8 +396,7 @@ mod prover_rounds_tests {
             .m_sparse
             .as_ref()
             .unwrap()
-            .keys()
-            .map(|&i| i)
+            .keys().copied()
             .collect();
         assert_eq!(keys, supp_m);
 
@@ -407,8 +405,7 @@ mod prover_rounds_tests {
             .m_sparse
             .as_ref()
             .unwrap()
-            .values()
-            .map(|&mi| mi)
+            .values().copied()
             .collect();
         assert_eq!(multiplicities, m_values);
     }
