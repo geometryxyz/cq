@@ -1,2 +1,2 @@
 # cq
-Let's go https://eprint.iacr.org/2022/1763.pdf
+Implementation of [cached quotients](https://eprint.iacr.org/2022/1763.pdf)
