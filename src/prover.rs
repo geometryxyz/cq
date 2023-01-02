@@ -165,10 +165,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         Ok(ProverFirstMessage { m_cm })
     }
 
-    pub fn round_2(
-        state: &mut State<E>,
-        beta: E::Fr,
-    ) -> Result<ProverSecondMessage<E>, Error> {
+    pub fn round_2(state: &mut State<E>, beta: E::Fr) -> Result<ProverSecondMessage<E>, Error> {
         let wtns_domain = GeneralEvaluationDomain::<E::Fr>::new(state.witness.size).unwrap();
         let m_sparse = state
             .m_sparse
@@ -392,21 +389,11 @@ mod prover_rounds_tests {
         assert!(res.is_ok());
 
         let keys = vec![1, 3, 4, 7];
-        let supp_m: Vec<usize> = state
-            .m_sparse
-            .as_ref()
-            .unwrap()
-            .keys().copied()
-            .collect();
+        let supp_m: Vec<usize> = state.m_sparse.as_ref().unwrap().keys().copied().collect();
         assert_eq!(keys, supp_m);
 
         let multiplicities = vec![Fr::one(), Fr::one(), Fr::one(), Fr::one()];
-        let m_values: Vec<Fr> = state
-            .m_sparse
-            .as_ref()
-            .unwrap()
-            .values().copied()
-            .collect();
+        let m_values: Vec<Fr> = state.m_sparse.as_ref().unwrap().values().copied().collect();
         assert_eq!(multiplicities, m_values);
     }
 

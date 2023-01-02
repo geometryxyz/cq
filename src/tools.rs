@@ -23,8 +23,7 @@ pub fn compute_lagrange_basis_commitments<C: AffineCurve>(tau_powers: &[C]) -> V
         .map(|tau_pow_i| tau_pow_i.into_projective())
         .collect();
     let p_evals: Vec<C::Projective> = domain.fft(&tau_projective);
-    let p_evals_reversed = iter::once(p_evals[0])
-        .chain(p_evals.into_iter().skip(1).rev());
+    let p_evals_reversed = iter::once(p_evals[0]).chain(p_evals.into_iter().skip(1).rev());
 
     let mut ls: Vec<C::Projective> = p_evals_reversed
         .into_iter()
