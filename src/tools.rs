@@ -51,7 +51,7 @@ pub fn compute_qs<E: PairingEngine>(
     let h_commitments: Vec<E::G1Projective> = toeplitz.mul_by_vec(&srs_proj);
     assert_eq!(h_commitments.len(), 2 * domain.size());
 
-    let ks: Vec<_> = domain.fft(&toeplitz.mul_by_vec(&srs_proj)[..domain.size()]);
+    let ks: Vec<_> = domain.fft(&h_commitments[..domain.size()]);
 
     let n_inv = domain.size_as_field_element().inverse().unwrap();
     let normalized_roots = domain.elements().map(|g_i| g_i * n_inv);
