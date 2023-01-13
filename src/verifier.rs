@@ -24,7 +24,7 @@ impl<E: PairingEngine> VerifierKey<E> {
     pub fn new(srs_g2: &[E::G2Affine], table_size: usize, witness_size: usize) -> Self {
         Self {
             x: srs_g2[1].into(),
-            x_pow_b0_bound: srs_g2[table_size - witness_size - 1].into(),
+            x_pow_b0_bound: srs_g2[table_size - witness_size + 1].into(),
             table_size,
             witness_size,
         }
