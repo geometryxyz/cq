@@ -215,7 +215,8 @@ impl<E: PairingEngine, FS: FiatShamirRng> Prover<E, FS> {
         let qb_cm: E::G1Affine = Kzg::<E>::commit_g1(&state.pk.srs_g1, &qb_poly).into();
 
         // step 10: compute degree correctness check for B0
-        let mut shifted_coeffs = vec![E::Fr::zero(); state.table.size - (state.witness.size + 1)];
+        let mut shifted_coeffs =
+            vec![E::Fr::zero(); state.table.size - 1 - (state.witness.size - 2)];
         shifted_coeffs.extend_from_slice(&b0_poly);
         let p_poly = DensePolynomial::from_coefficients_slice(&shifted_coeffs);
         let p_cm: E::G1Affine = Kzg::<E>::commit_g1(&state.pk.srs_g1, &p_poly).into();
@@ -445,7 +446,7 @@ mod prover_rounds_tests {
         // check b0 degree
         {
             let lhs_0 = b0_cm;
-            let rhs_0 = srs_g2[table.size - witness.size - 1];
+            let rhs_0 = srs_g2[table.size - 1 - (witness.size - 2)];
 
             let lhs_1 = p_cm;
             let rhs_1 = G2Affine::prime_subgroup_generator();
