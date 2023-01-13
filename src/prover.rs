@@ -446,7 +446,7 @@ mod prover_rounds_tests {
         // check b0 degree
         {
             let lhs_0 = b0_cm;
-            let rhs_0 = srs_g2[table.size - witness.size + 1];
+            let rhs_0 = srs_g2[table.size - 1 - (witness.size - 2)];
 
             let lhs_1 = p_cm;
             let rhs_1 = G2Affine::prime_subgroup_generator();
