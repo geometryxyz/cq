@@ -11,4 +11,8 @@ pub enum Error {
     Pairing2Failed,
     Pairing3Failed,
     Pairing4Failed,
+
+    ProverGrandSumFailed,
+    MVPairingFailed,
+    MVGrandSumFailed,
 }

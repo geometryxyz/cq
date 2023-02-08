@@ -2,6 +2,7 @@ pub mod data_structures;
 pub mod error;
 pub mod indexer;
 pub mod kzg;
+pub mod mv;
 pub mod prover;
 pub mod rng;
 pub mod table;
