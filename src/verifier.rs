@@ -1,10 +1,11 @@
-use std::{iter, marker::PhantomData, ops::Neg};
+use std::{marker::PhantomData, ops::Neg};
 
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, One};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 
 use crate::{
+    batcher::PairingBatcher,
     data_structures::{Proof, Statement},
     error::Error,
     indexer::CommonPreprocessedInput,
@@ -14,8 +15,8 @@ use crate::{
 };
 
 pub struct VerifierKey<E: PairingEngine> {
-    pub(crate) x: E::G2Prepared,
-    pub(crate) x_pow_b0_bound: E::G2Prepared,
+    pub(crate) x: E::G2Affine,
+    pub(crate) x_pow_b0_bound: E::G2Affine,
     pub(crate) table_size: usize,
     pub(crate) witness_size: usize,
 }
@@ -60,11 +61,6 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
 
         // separator for pairing batching
         let u: E::Fr = transcipt.squeeze_challenge();
-        let u_powers: Vec<E::Fr> = iter::successors(Some(u), |u_pow| Some(*u_pow * u))
-            .take(4)
-            .collect();
-
-        // NOTE: for easier convention, every pairing that is written on rhs of paper will be negated for usage in product of pairings
 
         let g_1 = E::G1Affine::prime_subgroup_generator();
         let g_2 = E::G2Affine::prime_subgroup_generator();
@@ -99,26 +95,30 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
 
         let beta_2 = g_2.mul(beta).into_affine();
 
-        let lhs_batched_1 = (proof.first_msg.m_cm.neg().into_projective()
-            + proof.second_msg.p_cm.mul(-u_powers[0])
-            + l.mul(u_powers[1])
-            + a_pt.mul(u_powers[2]))
-        .into_affine();
-        let lhs_batched_x = (proof.third_msg.pi_gamma.mul(u_powers[1])
-            + proof.third_msg.a0_cm.mul(u_powers[2]))
-        .neg()
-        .into_affine();
+        let mut p_batcher = PairingBatcher::<E>::new(u);
 
-        let res = E::product_of_pairings(&[
-            (lhs_batched_1.into(), g_2.into()),
-            (lhs_batched_x.into(), vk.x.clone()),
-            (
-                proof.second_msg.b0_cm.mul(u_powers[0]).into_affine().into(),
-                vk.x_pow_b0_bound.clone(),
-            ),
-            (proof.second_msg.qa_cm.neg().into(), common.zv_2.into()),
+        p_batcher.add_pairing(&[
             (proof.second_msg.a_cm.into(), (common.t_2 + beta_2).into()),
+            (proof.second_msg.qa_cm.neg().into(), common.zv_2.into()),
+            (proof.first_msg.m_cm.neg().into(), g_2.into()),
         ]);
+
+        p_batcher.add_pairing(&[
+            (proof.second_msg.b0_cm.into(), vk.x_pow_b0_bound.clone()),
+            (proof.second_msg.p_cm.neg().into(), g_2.into()),
+        ]);
+
+        p_batcher.add_pairing(&[
+            (l.into(), g_2.into()),
+            (proof.third_msg.pi_gamma.neg().into(), vk.x.clone()),
+        ]);
+
+        p_batcher.add_pairing(&[
+            (a_pt.into(), g_2.into()),
+            (proof.third_msg.a0_cm.neg().into(), vk.x.clone().into()),
+        ]);
+
+        let res = E::product_of_pairings(&p_batcher.finalize());
 
         if res != E::Fqk::one() {
             if cfg!(feature = "debug") {
@@ -138,7 +138,10 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
                 // check b0 degree
                 {
                     let res = E::product_of_pairings(&[
-                        (proof.second_msg.b0_cm.into(), vk.x_pow_b0_bound.clone()),
+                        (
+                            proof.second_msg.b0_cm.into(),
+                            vk.x_pow_b0_bound.clone().into(),
+                        ),
                         (proof.second_msg.p_cm.neg().into(), g_2.into()),
                     ]);
 
@@ -151,7 +154,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
                 {
                     let res = E::product_of_pairings(&[
                         (l.into(), g_2.into()),
-                        (proof.third_msg.pi_gamma.neg().into(), vk.x.clone()),
+                        (proof.third_msg.pi_gamma.neg().into(), vk.x.clone().into()),
                     ]);
 
                     if res != E::Fqk::one() {
@@ -163,7 +166,7 @@ impl<E: PairingEngine, FS: FiatShamirRng> Verifier<E, FS> {
                 {
                     let res = E::product_of_pairings(&[
                         (a_pt.into(), g_2.into()),
-                        (proof.third_msg.a0_cm.neg().into(), vk.x.clone()),
+                        (proof.third_msg.a0_cm.neg().into(), vk.x.clone().into()),
                     ]);
 
                     if res != E::Fqk::one() {

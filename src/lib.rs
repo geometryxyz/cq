@@ -1,3 +1,4 @@
+mod batcher;
 pub mod data_structures;
 pub mod error;
 pub mod indexer;
